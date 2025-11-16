@@ -10,7 +10,14 @@ const ProjectsModal = ({ isOpen, onClose, projects, onProjectSelect, canvas }) =
     const result = await loadProjectFromSupabase(project.file_path);
     
     if (result.success) {
-      onProjectSelect(result.data);
+      // Pass the complete project object including ID and metadata
+      onProjectSelect({
+        ...result.data,
+        id: project.id, // Include the project ID
+        project_name: project.project_name,
+        file_path: project.file_path,
+        created_at: project.created_at
+      });
       onClose();
     } else {
       alert('Error loading project: ' + result.error);
@@ -28,7 +35,13 @@ const ProjectsModal = ({ isOpen, onClose, projects, onProjectSelect, canvas }) =
     if (result.success) {
       // Remove from local projects list
       const updatedProjects = projects.filter(p => p.id !== project.id);
-      onProjectSelect(updatedProjects);
+      // Call a function to update projects in parent component
+      if (typeof onProjectSelect === 'function') {
+        // We need to inform parent about the deletion
+        // You might want to add a separate prop for this, but for now we'll use the existing one
+        // Let's assume the parent handles project updates
+        window.location.reload(); // Simple refresh to reload projects
+      }
       alert('Project deleted successfully!');
     } else {
       alert('Error deleting project: ' + result.error);
@@ -70,10 +83,15 @@ const ProjectsModal = ({ isOpen, onClose, projects, onProjectSelect, canvas }) =
                     <p className="text-sm text-gray-500">
                       {new Date(project.created_at).toLocaleDateString()}
                     </p>
+                    {project.updated_at && (
+                      <p className="text-xs text-gray-400">
+                        Updated: {new Date(project.updated_at).toLocaleDateString()}
+                      </p>
+                    )}
                   </div>
                   <button
                     onClick={(e) => handleDeleteProject(project, e)}
-                    className="text-red-500 hover:text-red-700 ml-2"
+                    className="text-red-500 hover:text-red-700 ml-2 text-sm px-2 py-1 border border-red-300 rounded hover:bg-red-50"
                   >
                     Delete
                   </button>

@@ -10,7 +10,56 @@ export const getMacId = () => {
   return macId;
 };
 
+export const updateProjectInSupabase = async (projectId, projectName, canvasJson, macId) => {
+  try {
+    // Convert canvas JSON to blob for storage
+    const canvasBlob = new Blob([JSON.stringify(canvasJson)], { 
+      type: 'application/json' 
+    });
+    
+    // First, get the current project to maintain the same file path
+    const { data: currentProject, error: fetchError } = await supabase
+      .from('user_projects')
+      .select('file_path')
+      .eq('id', projectId)
+      .single();
 
+    if (fetchError) throw fetchError;
+
+    // Upload updated file to the same path (overwrite)
+    const { error: storageError } = await supabase.storage
+      .from('projects')
+      .update(currentProject.file_path, canvasBlob);
+
+    if (storageError) throw storageError;
+
+    // Update project metadata in database
+    const { data, error } = await supabase
+      .from('user_projects')
+      .update({
+        project_name: projectName,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', projectId)
+      .select();
+
+    if (error) throw error;
+
+    return { success: true, data };
+  } catch (error) {
+    console.error('Error updating project:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+// Enhanced save function that checks if we should update or create new
+export const saveOrUpdateProject = async (projectId, projectName, canvasJson, macId) => {
+  if (projectId) {
+    return await updateProjectInSupabase(projectId, projectName, canvasJson, macId);
+  } else {
+    return await saveProjectToSupabase(projectName, canvasJson, macId);
+  }
+};
 // Save project to Supabase
 export const saveProjectToSupabase = async (projectName, canvasJson, macId) => {
   try {

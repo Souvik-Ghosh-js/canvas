@@ -12,7 +12,6 @@ import UploadTool from "./components/ui/UploadTool";
 import SchoolNameTool from "./components/ui/SchoolNameTool";
 import ProjectsModal from "./components/modal/projectModal";
 import EmailModal from "./components/modal/emailModal"; // Add this import
-import {saveProjectToSupabase, getProjectsByMacId, getMacId } from "./utils/supabaseUtils";
 import {
   FaTextHeight,
   FaIcons,
@@ -25,7 +24,8 @@ import { FaPaintBrush } from "react-icons/fa";
 import { IoImagesSharp, IoSettings } from "react-icons/io5";
 import { IoIosCloseCircle } from "react-icons/io";
 import { RiSendToBack, RiBringToFront } from "react-icons/ri";
-
+import SaveModal from "./components/modal/SaveModal.jsx"; // Add this import
+import {saveProjectToSupabase, getProjectsByMacId, getMacId, updateProjectInSupabase } from "./utils/supabaseUtils"; // Add updateProjectInSupabase
 import useFabricCanvas from "./hooks/useFabricCanvas";
 import * as tools from "./utils/canvasTools";
 import { addImage } from "./utils/imageTools";
@@ -66,7 +66,8 @@ function App() {
   const [isProjectsModalOpen, setIsProjectsModalOpen] = useState(false);
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false); // Add this state
   const [currentProjectUrl, setCurrentProjectUrl] = useState('');
-
+ const [isSaveModalOpen, setIsSaveModalOpen] = useState(false); // Add this state
+  const [currentProject, setCurrentProject] = useState(null); // Track current project
   const handleNavClick = (item) => {
     setIsModalOpen(true);
     setTool(item);
@@ -83,30 +84,47 @@ function App() {
       setProjects(result.data);
     }
   };
-
   const handleOpenProjects = () => {
     setIsProjectsModalOpen(true);
-  };  
+  };
 
   const handleProjectSelect = (projectData) => {
     canvas.clear();
     canvas.loadFromJSON(projectData, () => {
       canvas.renderAll();
     });
+    // Set the current project when loading
+    setCurrentProject(projectData);
   };
 
-   const handleSaveAndGetUrl = async (projectName = "My Design") => {
+  const handleSave = async (projectName = null, isUpdate = false) => {
     try {
       const macId = getMacId();
       const canvasJson = canvas.toJSON();
-      
-      // Save to Supabase using your existing function
-      const result = await saveProjectToSupabase(projectName, canvasJson, macId);
-      
+
+      let result;
+
+      if (isUpdate && currentProject && currentProject.id) {
+        // Update existing project
+        result = await updateProjectInSupabase(
+          currentProject.id,
+          projectName,
+          canvasJson,
+          macId
+        );
+      } else {
+        // Create new project
+        result = await saveProjectToSupabase(projectName, canvasJson, macId);
+        if (result.success) {
+          // Set the new project as current
+          setCurrentProject({ ...result.data[0], canvasData: canvasJson });
+        }
+      }
+
       if (result.success) {
-        const projectUrl = result.data[0].file_url;
-        setCurrentProjectUrl(projectUrl);
-        return projectUrl;
+        console.log('Project saved successfully');
+        await loadProjects(); // Refresh projects list
+        return true;
       } else {
         throw new Error(result.error);
       }
@@ -116,11 +134,33 @@ function App() {
     }
   };
 
-const handleSendEmail = async (email, projectName) => {
+  const handleSaveClick = () => {
+    setIsSaveModalOpen(true);
+  };
+
+  const handleSaveConfirm = async (projectName, saveAsNew = false) => {
+    try {
+      let isUpdate = false;
+
+      // Determine if we're updating or creating new
+      if (currentProject && currentProject.id && !saveAsNew) {
+        isUpdate = true;
+      }
+
+      await handleSave(projectName, isUpdate);
+      setIsSaveModalOpen(false);
+      // Show success message
+      alert('Project saved successfully!');
+    } catch (error) {
+      alert('Failed to save project: ' + error.message);
+    }
+  };
+
+  const handleSendEmail = async (email, projectName) => {
     try {
       // 1. Upload canvas image to separate images bucket (no database save)
       const imageResult = await uploadCanvasToImagesBucket(canvas, projectName);
-      
+
       if (!imageResult.success) {
         throw new Error('Failed to upload image: ' + imageResult.error);
       }
@@ -129,25 +169,9 @@ const handleSendEmail = async (email, projectName) => {
 
       // 2. Send email with the image URL (no project saved to database)
       await sendEmail(email, projectName, imageResult.imageUrl, projectName);
-      
+
     } catch (error) {
       throw new Error('Failed to send email: ' + error.message);
-    }
-  };
-   const handleSave = async () => {
-    try {
-      const macId = getMacId();
-      const canvasJson = canvas.toJSON();
-      const result = await saveProjectToSupabase("My Design", canvasJson, macId);
-      
-      if (result.success) {
-        console.log('Project saved to database');
-        // Show success message
-      } else {
-        throw new Error(result.error);
-      }
-    } catch (error) {
-      console.error('Failed to save project:', error);
     }
   };
 
@@ -228,12 +252,19 @@ const handleSendEmail = async (email, projectName) => {
     <div className="bg-gray-300 flex h-screen w-full flex-col overflow-hidden">
       <Header
         onExport={() => exportAsPNG(canvas)}
-        onSave={handleSave}
+        onSave={handleSaveClick}
         onOpen={handleOpenProjects}
         onExportPDF={() => exportMultipleJsonToPDF(canvasList, canvas)}
         onSendEmail={() => setIsEmailModalOpen(true)} // Add this prop
       />
-      
+      <SaveModal
+        isOpen={isSaveModalOpen}
+        onClose={() => setIsSaveModalOpen(false)}
+        onSave={handleSaveConfirm}
+        currentProject={currentProject}
+        defaultName={currentProject?.project_name || "My Design"}
+      />
+
       <ProjectsModal
         isOpen={isProjectsModalOpen}
         onClose={() => setIsProjectsModalOpen(false)}
@@ -243,7 +274,7 @@ const handleSendEmail = async (email, projectName) => {
       />
 
       {/* Add Email Modal */}
-       <EmailModal
+      <EmailModal
         isOpen={isEmailModalOpen}
         onClose={() => setIsEmailModalOpen(false)}
         onSendEmail={handleSendEmail}
