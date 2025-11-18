@@ -10,7 +10,7 @@ import BGTool from "./components/ui/BGTool";
 import LogoTool from "./components/ui/LogoTool";
 import UploadTool from "./components/ui/UploadTool";
 import SchoolNameTool from "./components/ui/SchoolNameTool";
-import TemplateTool from "./components/ui/Templatetool";
+import TemplateTool from "./components/ui/TemplateTool.jsx";
 import ProjectsModal from "./components/modal/projectModal";
 import EmailModal from "./components/modal/emailModal";
 import ZoomBar from "./components/ui/Zoombar.jsx";
