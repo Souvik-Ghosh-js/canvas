@@ -13,6 +13,7 @@ import SchoolNameTool from "./components/ui/SchoolNameTool";
 import TemplateTool from "./components/ui/Templatetool"; // Import TemplateTool
 import ProjectsModal from "./components/modal/projectModal";
 import EmailModal from "./components/modal/emailModal";
+import ZoomBar from "./components/ui/Zoombar.jsx";
 import {
   FaTextHeight,
   FaIcons,
@@ -58,7 +59,7 @@ import { exportMultipleJsonToPDF } from "./utils/exportMultiPagePDF";
 import { sendEmail } from "./utils/emailService";
 
 function App() {
-  const { canvasRef, canvas } = useFabricCanvas();
+  const { canvasRef, canvas  , designSize} = useFabricCanvas();
   const [canvasList, setCanvasList] = useState([{ id: 1, json: null }]);
   const [activePage, setActivePage] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -71,6 +72,7 @@ function App() {
   const [currentProjectUrl, setCurrentProjectUrl] = useState('');
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [currentProject, setCurrentProject] = useState(null);
+  const [zoom, setZoom] = useState(1); // 1 = 100%
 
   const handleNavClick = (item) => {
     setIsModalOpen(true);
@@ -88,7 +90,21 @@ function App() {
       setProjects(result.data);
     }
   };
+ const handleZoomChange = (value) => {
+    if (!canvas) return;
 
+    const zoomValue = parseFloat(value);
+    setZoom(zoomValue);
+
+    // Apply zoom with limit
+    canvas.setZoom(zoomValue);
+
+    // Keep the canvas centered
+    canvas.setWidth(designSize.width * zoomValue);
+    canvas.setHeight(designSize.height * zoomValue);
+
+    canvas.requestRenderAll();
+  };
   const handleOpenProjects = () => {
     setIsProjectsModalOpen(true);
   };
@@ -368,8 +384,9 @@ function App() {
         >
           <Redo />
         </button>
-      </section>
+         <ZoomBar zoom={zoom} setZoom={handleZoomChange} />
 
+      </section>
       <section className="w-full bg-gray-100 text-2xl flex justify-between px-7 py-3 md:hidden">
         {showDelete && (
           <section className="absolute bottom-3 left-33 z-10 flex items-center gap-2 bg-white px-4 py-2 rounded-xl">
@@ -500,7 +517,9 @@ function App() {
         </div>
 
         {/* Canvas */}
-        <div className="flex justify-center w-full mt-10">
+        <div className="flex justify-center w-full mt-10" style={{
+    overflow: "auto", // 🔥 Enable scrollbar
+  }}>
           <canvas ref={canvasRef}></canvas>
         </div>
 

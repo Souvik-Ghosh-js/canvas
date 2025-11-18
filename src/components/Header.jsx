@@ -43,12 +43,7 @@ function Header({ onExport, onOpen, onSave, onExportPDF, onSendEmail }) {
           >
             PNG
           </button>
-          <button
-            className="bg-blue-500 p-2 rounded-md text-white px-2 md:px-3 cursor-pointer"
-            onClick={onExportPDF}
-          >
-            PDF
-          </button>
+          
         </section>
       </section>
     </header>

@@ -5,29 +5,35 @@ import { Canvas } from "fabric";
 export default function useFabricCanvas() {
   const canvasRef = useRef(null);
   const [canvas, setCanvas] = useState(null);
-  const [designSize, setDesignSize] = useState({ width: 600, height: 800 });
 
-  // 🔥 Detect Device & Set Size
+  // Default logical page size (not scaled)
+  const [designSize, setDesignSize] = useState({ width: 400, height: 550 });
+
+  // Zoom control
+  const [zoom, setZoom] = useState(1);
+
+  // Detect device to set base canvas size
   const detectDeviceSize = () => {
     const width = window.innerWidth;
 
     if (width < 480) {
-      // 📱 Mobile
+      // Mobile
       return { width: 300, height: 450 };
     } else if (width < 1024) {
-      // 📲 Tablet
+      // Tablet
       return { width: 450, height: 600 };
     } else {
-      // 💻 Desktop
+      // Desktop
       return { width: 400, height: 550 };
     }
   };
 
+  // Set initial size
   useEffect(() => {
     setDesignSize(detectDeviceSize());
   }, []);
 
-  // Initialize Fabric Canvas
+  // Initialize Fabric canvas
   useEffect(() => {
     if (!canvasRef.current) return;
 
@@ -42,38 +48,27 @@ export default function useFabricCanvas() {
 
     setCanvas(initCanvas);
 
-    resizeCanvas(initCanvas, designSize);
-
-    const handleResize = () => {
-      const newSize = detectDeviceSize();
-      setDesignSize(newSize); // update state
-      resizeCanvas(initCanvas, newSize);
-    };
-
-    window.addEventListener("resize", handleResize);
-
     return () => {
-      window.removeEventListener("resize", handleResize);
       initCanvas.dispose();
     };
   }, [designSize.width, designSize.height]);
 
-  return { canvasRef, canvas, designSize };
-}
+  // --------------- 🔥 ZOOM HANDLER -----------------
+  const setCanvasZoom = (value) => {
+    if (!canvas) return;
 
-// 🔥 Resize canvas for container width + scale objects
-function resizeCanvas(canvas, designSize) {
-  const wrapper = canvas.getElement().parentNode;
-  if (!wrapper) return;
+    setZoom(value);
 
-  const containerWidth = wrapper.offsetWidth;
+    // Set Fabric logical zoom
+    canvas.setZoom(value);
 
-  const scale = containerWidth / designSize.width;
-  const newWidth = designSize.width * scale;
-  const newHeight = designSize.height * scale;
+    // Scale canvas display dimensions
+    canvas.setWidth(designSize.width * value);
+    canvas.setHeight(designSize.height * value);
 
-  canvas.setWidth(newWidth);
-  canvas.setHeight(newHeight);
+    canvas.requestRenderAll();
+  };
+  // ------------------------------------------------------
 
-  canvas.renderAll();
+  return { canvasRef, canvas, designSize, zoom, setCanvasZoom };
 }
