@@ -629,40 +629,52 @@ function App() {
         </section>
       )}
 
-      <section className="w-full bg-gray-100 text-2xl flex justify-between px-7 py-3 md:hidden">
-        {showDelete && (
-          <section className="absolute bottom-3 left-33 z-10 flex items-center gap-2 bg-white px-4 py-2 rounded-xl">
-            <button
-              className="text-3xl text-red-500 cursor-pointer"
-              onClick={() => handleDelete(canvas)}
-            >
-              <IoIosCloseCircle />
-            </button>
-            <button onClick={() => sendBackward(canvas)} className="text-3xl">
-              <RiSendToBack />
-            </button>
-            <button onClick={() => bringForward(canvas)} className="text-3xl">
-              <RiBringToFront />
-            </button>
-          </section>
-        )}
+ <section className="w-full bg-gray-100 text-2xl flex justify-between px-7 py-3">
+  {/* Delete and Layer Controls - Visible on all screens */}
+  {showDelete && (
+    <section className="absolute bottom-3 left-55  flex items-center gap-2 bg-white px-4 py-2 rounded-xl shadow-lg">
+      <button
+        className="text-3xl text-red-500 cursor-pointer hover:text-red-700 transition-colors"
+        onClick={() => handleDelete(canvas)}
+        title="Delete selected object"
+      >
+        <IoIosCloseCircle />
+      </button>
+      <button 
+        onClick={() => sendBackward(canvas)} 
+        className="text-3xl hover:text-blue-600 transition-colors"
+        title="Send backward"
+      >
+        <RiSendToBack />
+      </button>
+      <button 
+        onClick={() => bringForward(canvas)} 
+        className="text-3xl hover:text-blue-600 transition-colors"
+        title="Bring forward"
+      >
+        <RiBringToFront />
+      </button>
+    </section>
+  )}
 
-        <section className="flex gap-5">
-          <FaTextHeight onClick={() => handleNavClick("Text")} />
-          <IoImagesSharp onClick={() => handleNavClick("Images")} />
-          <FaShapes onClick={() => handleNavClick("Shapes")} />
-          <FaPaintBrush onClick={() => handleNavClick("Background")} />
-          <FaIcons onClick={() => handleNavClick("School Logo")} />
-          <FaBuilding onClick={() => handleNavClick("School Name")} />
-          <FaUpload onClick={() => handleNavClick("Upload")} />
-          <FaLayerGroup onClick={() => handleNavClick("Templates")} />
-        </section>
+  {/* Tool Icons - Hidden on mobile, shown on desktop */}
+  <section className="flex gap-5 md:flex hidden">
+    <FaTextHeight onClick={() => handleNavClick("Text")} className="cursor-pointer hover:text-blue-600" />
+    <IoImagesSharp onClick={() => handleNavClick("Images")} className="cursor-pointer hover:text-blue-600" />
+    <FaShapes onClick={() => handleNavClick("Shapes")} className="cursor-pointer hover:text-blue-600" />
+    <FaPaintBrush onClick={() => handleNavClick("Background")} className="cursor-pointer hover:text-blue-600" />
+    <FaIcons onClick={() => handleNavClick("School Logo")} className="cursor-pointer hover:text-blue-600" />
+    <FaBuilding onClick={() => handleNavClick("School Name")} className="cursor-pointer hover:text-blue-600" />
+    <FaUpload onClick={() => handleNavClick("Upload")} className="cursor-pointer hover:text-blue-600" />
+    <FaLayerGroup onClick={() => handleNavClick("Templates")} className="cursor-pointer hover:text-blue-600" />
+  </section>
 
-        <IoSettings
-          className="cursor-pointer"
-          onClick={() => setSideBarOpen(!isSideBarOpen)}
-        />
-      </section>
+  {/* Settings Icon */}
+  <IoSettings
+    className="cursor-pointer hover:text-blue-600 transition-colors"
+    onClick={() => setSideBarOpen(!isSideBarOpen)}
+  />
+</section>
 
       <main className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
