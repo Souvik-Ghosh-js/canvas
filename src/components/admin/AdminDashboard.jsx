@@ -32,7 +32,7 @@ const AdminDashboard = ({ onLogout }) => {
                   : "hover:bg-gray-200 text-gray-700"
               }`}
             >
-              {tab === "school" ? "School Images" : 
+              {tab === "school" ? "School Names" : 
                tab === "template" ? "Templates" : tab}
             </button>
           ))}

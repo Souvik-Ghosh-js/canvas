@@ -10,8 +10,9 @@ import BGTool from "./components/ui/BGTool";
 import LogoTool from "./components/ui/LogoTool";
 import UploadTool from "./components/ui/UploadTool";
 import SchoolNameTool from "./components/ui/SchoolNameTool";
+import TemplateTool from "./components/ui/Templatetool"; // Import TemplateTool
 import ProjectsModal from "./components/modal/projectModal";
-import EmailModal from "./components/modal/emailModal"; // Add this import
+import EmailModal from "./components/modal/emailModal";
 import {
   FaTextHeight,
   FaIcons,
@@ -19,19 +20,21 @@ import {
   FaUpload,
   FaShapes,
   FaBuilding,
+  FaLayerGroup, // Add this import
 } from "react-icons/fa6";
 import { FaPaintBrush } from "react-icons/fa";
 import { IoImagesSharp, IoSettings } from "react-icons/io5";
 import { IoIosCloseCircle } from "react-icons/io";
 import { RiSendToBack, RiBringToFront } from "react-icons/ri";
-import SaveModal from "./components/modal/SaveModal.jsx"; // Add this import
-import {saveProjectToSupabase, getProjectsByMacId, getMacId, updateProjectInSupabase } from "./utils/supabaseUtils"; // Add updateProjectInSupabase
+import SaveModal from "./components/modal/SaveModal.jsx";
+import {saveProjectToSupabase, getProjectsByMacId, getMacId, updateProjectInSupabase } from "./utils/supabaseUtils";
 import useFabricCanvas from "./hooks/useFabricCanvas";
 import * as tools from "./utils/canvasTools";
 import { addImage } from "./utils/imageTools";
 import { addBG } from "./utils/backGroundTool";
 import { addLogo } from "./utils/LogoTool";
 import { addWordCurve } from "./utils/wordCurveTool";
+import { applyTemplateToCanvas } from "./utils/templateUtils"; // Add this import
 import { bringForward, sendBackward } from "./utils/layerUtils";
 import { deleteActiveObject, handleDelete } from "./utils/deleteUtils";
 import {
@@ -40,7 +43,7 @@ import {
   duplicateCurrentPage,
   loadPageToCanvas,
 } from "./utils/pageUtils";
-import { uploadCanvasToImagesBucket } from "./utils/imageUploadUtils"; // Add this import
+import { uploadCanvasToImagesBucket } from "./utils/imageUploadUtils";
 
 import {
   exportAsPNG,
@@ -52,7 +55,7 @@ import { Circle, Rect, Textbox } from "fabric";
 import useHistory from "./hooks/useUndoRedo";
 import { Redo, Undo } from "lucide-react";
 import { exportMultipleJsonToPDF } from "./utils/exportMultiPagePDF";
-import { sendEmail } from "./utils/emailService"; // Add this import
+import { sendEmail } from "./utils/emailService";
 
 function App() {
   const { canvasRef, canvas } = useFabricCanvas();
@@ -64,10 +67,11 @@ function App() {
   const [showDelete, setShowDelete] = useState(false);
   const [projects, setProjects] = useState([]);
   const [isProjectsModalOpen, setIsProjectsModalOpen] = useState(false);
-  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false); // Add this state
+  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
   const [currentProjectUrl, setCurrentProjectUrl] = useState('');
- const [isSaveModalOpen, setIsSaveModalOpen] = useState(false); // Add this state
-  const [currentProject, setCurrentProject] = useState(null); // Track current project
+  const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
+  const [currentProject, setCurrentProject] = useState(null);
+
   const handleNavClick = (item) => {
     setIsModalOpen(true);
     setTool(item);
@@ -84,6 +88,7 @@ function App() {
       setProjects(result.data);
     }
   };
+
   const handleOpenProjects = () => {
     setIsProjectsModalOpen(true);
   };
@@ -93,7 +98,6 @@ function App() {
     canvas.loadFromJSON(projectData, () => {
       canvas.renderAll();
     });
-    // Set the current project when loading
     setCurrentProject(projectData);
   };
 
@@ -105,7 +109,6 @@ function App() {
       let result;
 
       if (isUpdate && currentProject && currentProject.id) {
-        // Update existing project
         result = await updateProjectInSupabase(
           currentProject.id,
           projectName,
@@ -113,17 +116,15 @@ function App() {
           macId
         );
       } else {
-        // Create new project
         result = await saveProjectToSupabase(projectName, canvasJson, macId);
         if (result.success) {
-          // Set the new project as current
           setCurrentProject({ ...result.data[0], canvasData: canvasJson });
         }
       }
 
       if (result.success) {
         console.log('Project saved successfully');
-        await loadProjects(); // Refresh projects list
+        await loadProjects();
         return true;
       } else {
         throw new Error(result.error);
@@ -142,14 +143,12 @@ function App() {
     try {
       let isUpdate = false;
 
-      // Determine if we're updating or creating new
       if (currentProject && currentProject.id && !saveAsNew) {
         isUpdate = true;
       }
 
       await handleSave(projectName, isUpdate);
       setIsSaveModalOpen(false);
-      // Show success message
       alert('Project saved successfully!');
     } catch (error) {
       alert('Failed to save project: ' + error.message);
@@ -158,7 +157,6 @@ function App() {
 
   const handleSendEmail = async (email, projectName) => {
     try {
-      // 1. Upload canvas image to separate images bucket (no database save)
       const imageResult = await uploadCanvasToImagesBucket(canvas, projectName);
 
       if (!imageResult.success) {
@@ -166,12 +164,21 @@ function App() {
       }
 
       console.log('Image uploaded to:', imageResult.imageUrl);
-
-      // 2. Send email with the image URL (no project saved to database)
       await sendEmail(email, projectName, imageResult.imageUrl, projectName);
 
     } catch (error) {
       throw new Error('Failed to send email: ' + error.message);
+    }
+  };
+
+  // Add template handler function
+  const handleTemplateSelect = async (templateUrl) => {
+    try {
+      await applyTemplateToCanvas(canvas, templateUrl);
+      setIsModalOpen(false);
+    } catch (error) {
+      console.error('Failed to apply template:', error);
+      alert('Failed to load template. Please try again.');
     }
   };
 
@@ -191,6 +198,7 @@ function App() {
     addWordArt_5: () => tools.addWordArt_5(canvas),
     addWordArt_6: () => tools.addWordArt_6(canvas),
     addWordArt_7: () => tools.addWordArt_7(canvas),
+    applyTemplate: (url) => applyTemplateToCanvas(canvas, url),
   };
 
   const addSchoolNameText = (text) => {
@@ -255,7 +263,7 @@ function App() {
         onSave={handleSaveClick}
         onOpen={handleOpenProjects}
         onExportPDF={() => exportMultipleJsonToPDF(canvasList, canvas)}
-        onSendEmail={() => setIsEmailModalOpen(true)} // Add this prop
+        onSendEmail={() => setIsEmailModalOpen(true)}
       />
       <SaveModal
         isOpen={isSaveModalOpen}
@@ -273,7 +281,6 @@ function App() {
         canvas={canvas}
       />
 
-      {/* Add Email Modal */}
       <EmailModal
         isOpen={isEmailModalOpen}
         onClose={() => setIsEmailModalOpen(false)}
@@ -389,6 +396,7 @@ function App() {
           <FaIcons onClick={() => handleNavClick("School Logo")} />
           <FaBuilding onClick={() => handleNavClick("School Name")} />
           <FaUpload onClick={() => handleNavClick("Upload")} />
+          <FaLayerGroup onClick={() => handleNavClick("Templates")} /> {/* Add Template icon */}
         </section>
 
         <IoSettings
@@ -427,6 +435,10 @@ function App() {
                   addSchoolName={(text) => addSchoolNameText(text)}
                 />
               )}
+              {/* Add Template Tool */}
+              {tool === "Templates" && (
+                <TemplateTool onTemplateSelect={handleTemplateSelect} />
+              )}
             </ToolModal>
 
             <section className="mt-5">
@@ -452,6 +464,11 @@ function App() {
                 <ToolButton
                   text="Background"
                   icon={<FaPaintBrush />}
+                  onToolClick={handleNavClick}
+                />
+                <ToolButton
+                  text="Templates"
+                  icon={<FaLayerGroup />}
                   onToolClick={handleNavClick}
                 />
               </section>
