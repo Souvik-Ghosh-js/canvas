@@ -172,17 +172,20 @@ const TemplateUpload = () => {
     }
   };
 
-  const validateJsonTemplate = (jsonData) => {
-    // Basic validation for Fabric.js template structure
-    if (!jsonData) return false;
-    
-    // Check if it has basic Fabric.js structure
-    const hasObjects = Array.isArray(jsonData.objects) || jsonData.objects;
-    const hasBackground = jsonData.background || jsonData.backgroundImage;
-    
-    return hasObjects || hasBackground;
-  };
-
+const validateJsonTemplate = (jsonData) => {
+  // Basic validation for Fabric.js template structure
+  if (!jsonData) return false;
+  
+  // Check for standard Fabric.js structure OR your custom structure
+  const hasStandardObjects = Array.isArray(jsonData.objects) || jsonData.objects;
+  const hasStandardBackground = jsonData.background || jsonData.backgroundImage;
+  
+  // Check for your custom structure
+  const hasCustomObjects = jsonData.canvasData && (Array.isArray(jsonData.canvasData.objects) || jsonData.canvasData.objects);
+  const hasCustomBackground = jsonData.canvasData && (jsonData.canvasData.background || jsonData.canvasData.backgroundImage);
+  
+  return (hasStandardObjects || hasStandardBackground) || (hasCustomObjects || hasCustomBackground);
+};
   const uploadTemplate = async () => {
     if (!selectedFile) {
       setMessage({ type: "error", text: "Please select a file to upload" });
@@ -497,25 +500,27 @@ const TemplateUpload = () => {
               )}
 
               {previewJson && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    JSON Template Info
-                  </label>
-                  <div className="bg-gray-50 border rounded-lg p-4">
-                    <div className="flex items-center mb-2">
-                      <Code size={16} className="text-green-500 mr-2" />
-                      <span className="font-medium">Valid JSON Template</span>
-                    </div>
-                    <div className="text-sm text-gray-600 space-y-1">
-                      <p>• Objects: {previewJson.objects?.length || 0}</p>
-                      <p>• Background: {previewJson.background ? 'Yes' : 'No'}</p>
-                      <p>• Background Image: {previewJson.backgroundImage ? 'Yes' : 'No'}</p>
-                      <p>• Canvas Width: {previewJson.width || 'N/A'}</p>
-                      <p>• Canvas Height: {previewJson.height || 'N/A'}</p>
-                    </div>
-                  </div>
-                </div>
-              )}
+  <div>
+    <label className="block text-sm font-medium text-gray-700 mb-2">
+      JSON Template Info
+    </label>
+    <div className="bg-gray-50 border rounded-lg p-4">
+      <div className="flex items-center mb-2">
+        <Code size={16} className="text-green-500 mr-2" />
+        <span className="font-medium">Valid JSON Template</span>
+      </div>
+      <div className="text-sm text-gray-600 space-y-1">
+        {/* Handle both standard and custom JSON structures */}
+        <p>• Objects: {previewJson.canvasData?.objects?.length || previewJson.objects?.length || 0}</p>
+        <p>• Background: {previewJson.canvasData?.background ? 'Yes' : previewJson.background ? 'Yes' : 'No'}</p>
+        <p>• Background Image: {previewJson.canvasData?.backgroundImage ? 'Yes' : previewJson.backgroundImage ? 'Yes' : 'No'}</p>
+        <p>• Canvas Width: {previewJson.canvasData?.width || previewJson.width || 'N/A'}</p>
+        <p>• Canvas Height: {previewJson.canvasData?.height || previewJson.height || 'N/A'}</p>
+        <p>• Structure: {previewJson.canvasData ? 'Custom Wrapper' : 'Standard Fabric.js'}</p>
+      </div>
+    </div>
+  </div>
+)}
 
               {selectedFile && !previewImage && !previewJson && (
                 <div className="bg-gray-50 border rounded-lg p-4">

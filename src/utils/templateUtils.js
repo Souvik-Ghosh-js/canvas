@@ -24,7 +24,7 @@ export const getTemplatesFromBucket = async () => {
 
           // Extract metadata from filename
           const metadata = extractMetadataFromFileName(file.name);
-          
+
           // Determine template type and get preview data
           let templateData = {
             name: file.name,
@@ -38,16 +38,20 @@ export const getTemplatesFromBucket = async () => {
           };
 
           // For JSON templates, try to load and parse the data
+          // In getTemplatesFromBucket function, update the JSON parsing part:
           if (file.name.endsWith('.json')) {
             try {
               const response = await fetch(urlData.publicUrl);
               if (response.ok) {
                 const jsonData = await response.json();
                 templateData.jsonData = jsonData;
-                
-                // Extract preview image if available
+
+                // Extract preview image from both standard and custom structures
                 if (jsonData.backgroundImage) {
                   templateData.previewUrl = jsonData.backgroundImage;
+                } else if (jsonData.canvasData?.backgroundImage) {
+                  // Handle your custom structure
+                  templateData.previewUrl = jsonData.canvasData.backgroundImage;
                 }
               }
             } catch (e) {
@@ -68,7 +72,7 @@ export const getTemplatesFromBucket = async () => {
 
     // Filter out null values
     const validTemplates = templates.filter(template => template !== null);
-    
+
     return { success: true, templates: validTemplates };
   } catch (error) {
     console.error('Error fetching templates:', error);
@@ -90,7 +94,7 @@ const getFileType = (fileName) => {
 const extractMetadataFromFileName = (fileName) => {
   const withoutExtension = fileName.replace(/\.[^/.]+$/, "");
   const parts = withoutExtension.split('_');
-  
+
   return {
     category: parts[0] || 'Other',
     name: parts[1] ? parts[1].replace(/-/g, ' ') : withoutExtension,
@@ -127,12 +131,15 @@ export const applyTemplateToCanvas = async (canvas, template) => {
 const applyJsonTemplateToCanvas = (canvas, jsonData) => {
   return new Promise((resolve, reject) => {
     try {
+      // Handle both standard Fabric.js and custom wrapper formats
+      const templateData = jsonData.canvasData || jsonData;
+      
       // Load the JSON template into the canvas
-      canvas.loadFromJSON(jsonData, () => {
+      canvas.loadFromJSON(templateData, () => {
         // Set canvas dimensions from template if available
-        if (jsonData.width && jsonData.height) {
-          canvas.setWidth(jsonData.width);
-          canvas.setHeight(jsonData.height);
+        if (templateData.width && templateData.height) {
+          canvas.setWidth(templateData.width);
+          canvas.setHeight(templateData.height);
         }
 
         canvas.renderAll();
@@ -143,7 +150,6 @@ const applyJsonTemplateToCanvas = (canvas, jsonData) => {
     }
   });
 };
-
 const applyImageTemplateToCanvas = (canvas, imageUrl) => {
   return new Promise((resolve, reject) => {
     fabric.Image.fromURL(imageUrl, (img) => {
@@ -215,7 +221,7 @@ const createJsonTemplateThumbnail = async (jsonData) => {
           const originalWidth = jsonData.width || 800;
           const originalHeight = jsonData.height || 600;
           const scale = Math.min(200 / originalWidth, 150 / originalHeight) * 0.8;
-          
+
           canvas.setZoom(scale);
           canvas.renderAll();
 
@@ -224,7 +230,7 @@ const createJsonTemplateThumbnail = async (jsonData) => {
             format: 'png',
             quality: 0.7
           });
-          
+
           canvas.dispose();
           resolve(dataUrl);
         } catch (renderError) {
