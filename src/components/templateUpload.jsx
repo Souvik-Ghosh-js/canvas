@@ -1,23 +1,23 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "../supabase/config";
-import { Trash2, Download, Upload, Eye, FileText, Image, Code } from "lucide-react";
+import { Trash2, Download, Upload, Eye, FileText, Image, Code, X } from "lucide-react";
 
 const TemplateUpload = () => {
   const [activeSection, setActiveSection] = useState("upload");
   const [uploading, setUploading] = useState(false);
-  const [templateName, setTemplateName] = useState("");
-  const [templateCategory, setTemplateCategory] = useState("");
-  const [templateDescription, setTemplateDescription] = useState("");
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [previewImage, setPreviewImage] = useState(null);
+  const [templateNames, setTemplateNames] = useState({});
+  const [templateCategories, setTemplateCategories] = useState({});
+  const [templateDescriptions, setTemplateDescriptions] = useState({});
+  const [selectedFiles, setSelectedFiles] = useState([]);
+  const [previewImages, setPreviewImages] = useState({});
   const [message, setMessage] = useState({ type: "", text: "" });
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [previewJson, setPreviewJson] = useState(null);
+  const [previewJsons, setPreviewJsons] = useState({});
 
   const defaultCategories = [
     "Certificate",
-    "Diploma", 
+    "Diploma",
     "Award",
     "Invitation",
     "Brochure",
@@ -50,27 +50,32 @@ const TemplateUpload = () => {
       const templatesWithUrls = await Promise.all(
         data.map(async (file) => {
           const url = supabase.storage.from('templates').getPublicUrl(file.name).data.publicUrl;
-          
+
           // For JSON files, try to extract preview and metadata
           let previewUrl = null;
           let jsonData = null;
-          
+
+          // In the loadTemplates function, update the JSON parsing part:
           if (file.name.endsWith('.json')) {
             try {
               const response = await fetch(url);
               jsonData = await response.json();
-              
-              // Extract preview from JSON if available
+
+              // Extract preview from JSON if available (all three structures)
               if (jsonData.backgroundImage) {
                 previewUrl = jsonData.backgroundImage;
+              } else if (jsonData.canvasData?.backgroundImage) {
+                previewUrl = jsonData.canvasData.backgroundImage;
+              } else if (jsonData.pages?.[0]?.json?.backgroundImage) {
+                previewUrl = jsonData.pages[0].json.backgroundImage;
               }
             } catch (e) {
               console.warn('Could not parse JSON template:', file.name);
             }
           }
-          
+
           const metadata = extractMetadataFromFileName(file.name);
-          
+
           return {
             name: file.name,
             url: url,
@@ -98,7 +103,7 @@ const TemplateUpload = () => {
   const extractMetadataFromFileName = (fileName) => {
     const withoutExtension = fileName.replace(/\.[^/.]+$/, "");
     const parts = withoutExtension.split('_');
-    
+
     return {
       category: parts[0] || 'Other',
       name: parts[1] ? parts[1].replace(/-/g, ' ') : 'Unnamed Template',
@@ -107,194 +112,306 @@ const TemplateUpload = () => {
   };
 
   const handleFileSelect = async (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      // Validate file type - primarily JSON for templates
-      const validTypes = [
-        "application/json",
-        "image/jpeg", 
-        "image/png", 
-        "image/webp"
-      ];
-      
-      if (!validTypes.includes(file.type)) {
-        setMessage({ 
-          type: "error", 
-          text: "Please select a valid file (JSON, JPEG, PNG, WebP)" 
-        });
-        setSelectedFile(null);
-        setPreviewImage(null);
-        setPreviewJson(null);
-        return;
-      }
+    const files = Array.from(e.target.files);
+    if (files.length > 0) {
+      const validFiles = [];
+      const invalidFiles = [];
 
-      // Validate file size (max 5MB for JSON templates)
-      if (file.size > 5 * 1024 * 1024) {
-        setMessage({ type: "error", text: "File size must be less than 5MB" });
-        setSelectedFile(null);
-        setPreviewImage(null);
-        setPreviewJson(null);
-        return;
-      }
+      for (const file of files) {
+        // Validate file type
+        const validTypes = [
+          "application/json",
+          "image/jpeg",
+          "image/png",
+          "image/webp"
+        ];
 
-      setSelectedFile(file);
-      
-      // Handle JSON files specifically
-      if (file.type === 'application/json') {
-        try {
-          const text = await file.text();
-          const jsonData = JSON.parse(text);
-          setPreviewJson(jsonData);
-          
-          // Extract preview image from JSON if available
-          if (jsonData.backgroundImage) {
-            setPreviewImage(jsonData.backgroundImage);
-          } else {
-            setPreviewImage(null);
-          }
-        } catch (error) {
-          setMessage({ 
-            type: "error", 
-            text: "Invalid JSON file. Please check the format." 
-          });
-          setSelectedFile(null);
-          setPreviewJson(null);
-          setPreviewImage(null);
-          return;
+        if (!validTypes.includes(file.type)) {
+          invalidFiles.push(`${file.name} - Invalid file type`);
+          continue;
         }
-      } else if (file.type.startsWith('image/')) {
-        // For image files, create preview
-        setPreviewImage(URL.createObjectURL(file));
-        setPreviewJson(null);
+
+        // Validate file size (max 5MB for templates)
+        if (file.size > 5 * 1024 * 1024) {
+          invalidFiles.push(`${file.name} - File size exceeds 5MB`);
+          continue;
+        }
+
+        // Handle JSON files specifically
+        if (file.type === 'application/json') {
+          try {
+            const text = await file.text();
+            const jsonData = JSON.parse(text);
+
+            if (!validateJsonTemplate(jsonData)) {
+              invalidFiles.push(`${file.name} - Invalid template structure`);
+              continue;
+            }
+
+            setPreviewJsons(prev => ({
+              ...prev,
+              [file.name]: jsonData
+            }));
+
+            // Extract preview image from JSON if available
+            if (jsonData.backgroundImage) {
+              setPreviewImages(prev => ({
+                ...prev,
+                [file.name]: jsonData.backgroundImage
+              }));
+            }
+          } catch (error) {
+            invalidFiles.push(`${file.name} - Invalid JSON format`);
+            continue;
+          }
+        } else if (file.type.startsWith('image/')) {
+          // For image files, create preview
+          setPreviewImages(prev => ({
+            ...prev,
+            [file.name]: URL.createObjectURL(file)
+          }));
+        }
+
+        validFiles.push(file);
+
+        // Set default metadata based on filename
+        const defaultName = file.name
+          .replace(/\.[^/.]+$/, "")
+          .replace(/[_-]/g, " ")
+          .replace(/\b\w/g, l => l.toUpperCase());
+
+        setTemplateNames(prev => ({
+          ...prev,
+          [file.name]: defaultName
+        }));
+
+        setTemplateCategories(prev => ({
+          ...prev,
+          [file.name]: 'Other'
+        }));
+
+        setTemplateDescriptions(prev => ({
+          ...prev,
+          [file.name]: ''
+        }));
       }
-      
-      setMessage({ type: "", text: "" });
+
+      if (invalidFiles.length > 0) {
+        setMessage({
+          type: "error",
+          text: `Some files were rejected:\n${invalidFiles.join('\n')}`
+        });
+      }
+
+      if (validFiles.length > 0) {
+        setSelectedFiles(prev => [...prev, ...validFiles]);
+        setMessage({ type: "", text: "" });
+      }
     }
   };
 
-const validateJsonTemplate = (jsonData) => {
-  // Basic validation for Fabric.js template structure
-  if (!jsonData) return false;
-  
-  // Check for standard Fabric.js structure OR your custom structure
-  const hasStandardObjects = Array.isArray(jsonData.objects) || jsonData.objects;
-  const hasStandardBackground = jsonData.background || jsonData.backgroundImage;
-  
-  // Check for your custom structure
-  const hasCustomObjects = jsonData.canvasData && (Array.isArray(jsonData.canvasData.objects) || jsonData.canvasData.objects);
-  const hasCustomBackground = jsonData.canvasData && (jsonData.canvasData.background || jsonData.canvasData.backgroundImage);
-  
-  return (hasStandardObjects || hasStandardBackground) || (hasCustomObjects || hasCustomBackground);
-};
-  const uploadTemplate = async () => {
-    if (!selectedFile) {
-      setMessage({ type: "error", text: "Please select a file to upload" });
+  const validateJsonTemplate = (jsonData) => {
+    if (!jsonData) return false;
+
+    // Structure 1: Standard Fabric.js format
+    const hasStandardObjects = Array.isArray(jsonData.objects) || jsonData.objects;
+    const hasStandardBackground = jsonData.background || jsonData.backgroundImage;
+
+    // Structure 2: Custom wrapper with canvasData
+    const hasCustomObjects = jsonData.canvasData && (Array.isArray(jsonData.canvasData.objects) || jsonData.canvasData.objects);
+    const hasCustomBackground = jsonData.canvasData && (jsonData.canvasData.background || jsonData.canvasData.backgroundImage);
+
+    // Structure 3: Multi-page format with pages array
+    const hasPageObjects = jsonData.pages &&
+      Array.isArray(jsonData.pages) &&
+      jsonData.pages.length > 0 &&
+      jsonData.pages[0].json &&
+      (Array.isArray(jsonData.pages[0].json.objects) || jsonData.pages[0].json.objects);
+    const hasPageBackground = jsonData.pages &&
+      jsonData.pages.length > 0 &&
+      jsonData.pages[0].json &&
+      (jsonData.pages[0].json.background || jsonData.pages[0].json.backgroundImage);
+
+    return (hasStandardObjects || hasStandardBackground) ||
+      (hasCustomObjects || hasCustomBackground) ||
+      (hasPageObjects || hasPageBackground);
+  };
+
+  const uploadTemplates = async () => {
+    if (selectedFiles.length === 0) {
+      setMessage({ type: "error", text: "Please select files to upload" });
       return;
     }
 
-    if (!templateName.trim()) {
-      setMessage({ type: "error", text: "Please enter a template name" });
+    // Check if all files have required metadata
+    const missingNames = selectedFiles.filter(file => !templateNames[file.name]?.trim());
+    const missingCategories = selectedFiles.filter(file => !templateCategories[file.name]);
+
+    if (missingNames.length > 0) {
+      setMessage({ type: "error", text: "Please enter template names for all files" });
       return;
     }
 
-    if (!templateCategory) {
-      setMessage({ type: "error", text: "Please select a category" });
+    if (missingCategories.length > 0) {
+      setMessage({ type: "error", text: "Please select categories for all files" });
       return;
-    }
-
-    // Additional validation for JSON files
-    if (selectedFile.type === 'application/json' && previewJson) {
-      if (!validateJsonTemplate(previewJson)) {
-        setMessage({ 
-          type: "error", 
-          text: "Invalid template structure. Please check if it's a valid Fabric.js template." 
-        });
-        return;
-      }
     }
 
     setUploading(true);
     setMessage({ type: "", text: "" });
 
     try {
-      const fileExtension = selectedFile.name.split('.').pop();
-      const sanitizedName = templateName
-        .toLowerCase()
-        .replace(/[^a-z0-9]/g, '_')
-        .replace(/_+/g, '_');
-      
-      const sanitizedCategory = templateCategory
-        .toLowerCase()
-        .replace(/[^a-z0-9]/g, '_')
-        .replace(/_+/g, '_');
-      
-      const sanitizedDescription = templateDescription
-        .toLowerCase()
-        .replace(/[^a-z0-9]/g, '_')
-        .replace(/_+/g, '_')
-        .substring(0, 50);
+      const uploadPromises = selectedFiles.map(async (file) => {
+        const templateName = templateNames[file.name].trim();
+        const templateCategory = templateCategories[file.name];
+        const templateDescription = templateDescriptions[file.name] || '';
 
-      const fileName = `${sanitizedCategory}_${sanitizedName}_${sanitizedDescription}.${fileExtension}`;
+        const fileExtension = file.name.split('.').pop();
+        const sanitizedName = templateName
+          .toLowerCase()
+          .replace(/[^a-z0-9]/g, '_')
+          .replace(/_+/g, '_');
 
-      const { data, error } = await supabase.storage
-        .from('templates')
-        .upload(fileName, selectedFile, {
-          cacheControl: '3600',
-          upsert: false
-        });
+        const sanitizedCategory = templateCategory
+          .toLowerCase()
+          .replace(/[^a-z0-9]/g, '_')
+          .replace(/_+/g, '_');
 
-      if (error) {
-        if (error.message === 'The resource already exists') {
-          setMessage({ type: "error", text: "A template with this name already exists. Please use a different name." });
-        } else {
-          throw error;
+        const sanitizedDescription = templateDescription
+          .toLowerCase()
+          .replace(/[^a-z0-9]/g, '_')
+          .replace(/_+/g, '_')
+          .substring(0, 50);
+
+        const fileName = `${sanitizedCategory}_${sanitizedName}_${sanitizedDescription}.${fileExtension}`;
+
+        const { data, error } = await supabase.storage
+          .from('templates')
+          .upload(fileName, file, {
+            cacheControl: '3600',
+            upsert: false
+          });
+
+        if (error) {
+          if (error.message === 'The resource already exists') {
+            throw new Error(`"${templateName}" already exists. Please use a different name.`);
+          } else {
+            throw error;
+          }
         }
-        return;
+
+        return { fileName, templateName };
+      });
+
+      const results = await Promise.allSettled(uploadPromises);
+
+      const successfulUploads = results.filter(result => result.status === 'fulfilled');
+      const failedUploads = results.filter(result => result.status === 'rejected');
+
+      if (failedUploads.length > 0) {
+        const errorMessages = failedUploads.map((result, index) =>
+          `${selectedFiles[index]?.name}: ${result.reason.message}`
+        );
+
+        if (successfulUploads.length > 0) {
+          setMessage({
+            type: "warning",
+            text: `Some templates uploaded successfully, but ${failedUploads.length} failed:\n${errorMessages.join('\n')}`
+          });
+        } else {
+          setMessage({
+            type: "error",
+            text: `Upload failed:\n${errorMessages.join('\n')}`
+          });
+        }
+      } else {
+        setMessage({
+          type: "success",
+          text: `Successfully uploaded ${selectedFiles.length} template(s)!`
+        });
       }
 
-      setMessage({ type: "success", text: "Template uploaded successfully!" });
-      
-      // Reset form
-      setTemplateName("");
-      setTemplateCategory("");
-      setTemplateDescription("");
-      setSelectedFile(null);
-      setPreviewImage(null);
-      setPreviewJson(null);
-      document.getElementById('template-file-input').value = "";
+      // Reset form only if all uploads were successful
+      if (failedUploads.length === 0) {
+        setSelectedFiles([]);
+        setTemplateNames({});
+        setTemplateCategories({});
+        setTemplateDescriptions({});
+        setPreviewImages({});
+        setPreviewJsons({});
+        document.getElementById('template-file-input').value = "";
+      }
 
-      // Switch to manage section and reload
-      setActiveSection("manage");
-      loadTemplates();
+      // Reload the templates list if any uploads were successful
+      if (successfulUploads.length > 0) {
+        loadTemplates();
+      }
 
     } catch (error) {
-      console.error('Error uploading template:', error);
+      console.error('Error uploading templates:', error);
       setMessage({ type: "error", text: `Upload failed: ${error.message}` });
     } finally {
       setUploading(false);
     }
   };
 
-  const deleteTemplate = async (fileName) => {
-    if (!window.confirm('Are you sure you want to delete this template? This action cannot be undone.')) {
-      return;
-    }
+  const removeSelectedFile = (fileName) => {
+    setSelectedFiles(prev => prev.filter(file => file.name !== fileName));
 
-    try {
-      const { error } = await supabase.storage
-        .from('templates')
-        .remove([fileName]);
+    // Clean up related state
+    setTemplateNames(prev => {
+      const newNames = { ...prev };
+      delete newNames[fileName];
+      return newNames;
+    });
 
-      if (error) throw error;
+    setTemplateCategories(prev => {
+      const newCategories = { ...prev };
+      delete newCategories[fileName];
+      return newCategories;
+    });
 
-      setTemplates(prev => prev.filter(template => template.name !== fileName));
-      setMessage({ type: "success", text: "Template deleted successfully!" });
-      
-      setTimeout(() => setMessage({ type: "", text: "" }), 3000);
-    } catch (error) {
-      console.error('Error deleting template:', error);
-      setMessage({ type: "error", text: "Failed to delete template" });
-    }
+    setTemplateDescriptions(prev => {
+      const newDescriptions = { ...prev };
+      delete newDescriptions[fileName];
+      return newDescriptions;
+    });
+
+    setPreviewImages(prev => {
+      const newPreviews = { ...prev };
+      if (newPreviews[fileName]) {
+        URL.revokeObjectURL(newPreviews[fileName]);
+        delete newPreviews[fileName];
+      }
+      return newPreviews;
+    });
+
+    setPreviewJsons(prev => {
+      const newJsons = { ...prev };
+      delete newJsons[fileName];
+      return newJsons;
+    });
+  };
+
+  const updateTemplateName = (fileName, name) => {
+    setTemplateNames(prev => ({
+      ...prev,
+      [fileName]: name
+    }));
+  };
+
+  const updateTemplateCategory = (fileName, category) => {
+    setTemplateCategories(prev => ({
+      ...prev,
+      [fileName]: category
+    }));
+  };
+
+  const updateTemplateDescription = (fileName, description) => {
+    setTemplateDescriptions(prev => ({
+      ...prev,
+      [fileName]: description
+    }));
   };
 
   const handleDragOver = (e) => {
@@ -305,11 +422,10 @@ const validateJsonTemplate = (jsonData) => {
   const handleDrop = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    
-    const files = e.dataTransfer.files;
+
+    const files = Array.from(e.dataTransfer.files);
     if (files.length > 0) {
-      const file = files[0];
-      const inputEvent = { target: { files: [file] } };
+      const inputEvent = { target: { files } };
       handleFileSelect(inputEvent);
     }
   };
@@ -335,8 +451,29 @@ const validateJsonTemplate = (jsonData) => {
     if (template.previewUrl) {
       window.open(template.previewUrl, '_blank');
     } else if (template.jsonData) {
-      // Show JSON data in alert or modal (you can enhance this)
       alert(`Template: ${template.displayName}\nObjects: ${template.jsonData.objects?.length || 0}\nBackground: ${template.jsonData.background ? 'Yes' : 'No'}`);
+    }
+  };
+
+  const deleteTemplate = async (fileName) => {
+    if (!window.confirm('Are you sure you want to delete this template? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase.storage
+        .from('templates')
+        .remove([fileName]);
+
+      if (error) throw error;
+
+      setTemplates(prev => prev.filter(template => template.name !== fileName));
+      setMessage({ type: "success", text: "Template deleted successfully!" });
+
+      setTimeout(() => setMessage({ type: "", text: "" }), 3000);
+    } catch (error) {
+      console.error('Error deleting template:', error);
+      setMessage({ type: "error", text: "Failed to delete template" });
     }
   };
 
@@ -352,22 +489,20 @@ const validateJsonTemplate = (jsonData) => {
       <div className="flex border-b">
         <button
           onClick={() => setActiveSection("upload")}
-          className={`flex items-center px-6 py-3 font-medium border-b-2 transition-colors ${
-            activeSection === "upload"
+          className={`flex items-center px-6 py-3 font-medium border-b-2 transition-colors ${activeSection === "upload"
               ? "border-blue-500 text-blue-600 bg-blue-50"
               : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-          }`}
+            }`}
         >
           <Upload size={18} className="mr-2" />
-          Upload New Template
+          Upload New {selectedFiles.length > 0 && `(${selectedFiles.length})`}
         </button>
         <button
           onClick={() => setActiveSection("manage")}
-          className={`flex items-center px-6 py-3 font-medium border-b-2 transition-colors ${
-            activeSection === "manage"
+          className={`flex items-center px-6 py-3 font-medium border-b-2 transition-colors ${activeSection === "manage"
               ? "border-blue-500 text-blue-600 bg-blue-50"
               : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-          }`}
+            }`}
         >
           <Eye size={18} className="mr-2" />
           Manage Templates ({templates.length})
@@ -378,79 +513,32 @@ const validateJsonTemplate = (jsonData) => {
       <div className="p-6">
         {message.text && (
           <div
-            className={`mb-6 p-4 rounded-lg ${
-              message.type === 'error'
+            className={`mb-6 p-4 rounded-lg whitespace-pre-line ${message.type === 'error'
                 ? 'bg-red-100 border border-red-200 text-red-700'
-                : 'bg-green-100 border border-green-200 text-green-700'
-            }`}
+                : message.type === 'warning'
+                  ? 'bg-yellow-100 border border-yellow-200 text-yellow-700'
+                  : 'bg-green-100 border border-green-200 text-green-700'
+              }`}
           >
             {message.text}
           </div>
         )}
 
         {activeSection === "upload" ? (
-          <div className="max-w-2xl">
+          <div className="max-w-4xl">
             <div className="space-y-6">
-              {/* Template Name Input */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Template Name *
-                </label>
-                <input
-                  type="text"
-                  value={templateName}
-                  onChange={(e) => setTemplateName(e.target.value)}
-                  placeholder="Enter template name (e.g., Gold Certificate)"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-
-              {/* Category Selection */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Category *
-                </label>
-                <select
-                  value={templateCategory}
-                  onChange={(e) => setTemplateCategory(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="">Select a category</option>
-                  {defaultCategories.map((category) => (
-                    <option key={category} value={category}>
-                      {category}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Description Input */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Description
-                </label>
-                <textarea
-                  value={templateDescription}
-                  onChange={(e) => setTemplateDescription(e.target.value)}
-                  placeholder="Brief description of the template (optional)"
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-
               {/* File Upload Area */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Template File *
+                  Template Files *
                 </label>
                 <div
                   onDragOver={handleDragOver}
                   onDrop={handleDrop}
-                  className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-all ${
-                    selectedFile 
-                      ? 'border-green-500 bg-green-50' 
+                  className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-all ${selectedFiles.length > 0
+                      ? 'border-green-500 bg-green-50'
                       : 'border-gray-300 hover:border-gray-400 bg-gray-50'
-                  }`}
+                    }`}
                   onClick={() => document.getElementById('template-file-input').click()}
                 >
                   <input
@@ -459,14 +547,14 @@ const validateJsonTemplate = (jsonData) => {
                     accept=".json,.jpg,.jpeg,.png,.webp"
                     onChange={handleFileSelect}
                     className="hidden"
+                    multiple
                   />
-                  
-                  {selectedFile ? (
+
+                  {selectedFiles.length > 0 ? (
                     <div className="text-green-600">
-                      <p className="font-medium text-lg">✓ File Selected</p>
-                      <p className="text-sm mt-2">{selectedFile.name}</p>
-                      <p className="text-xs text-gray-500 mt-2">
-                        Click to select a different file or drag and drop
+                      <p className="font-medium text-lg">✓ {selectedFiles.length} File(s) Selected</p>
+                      <p className="text-sm mt-2">
+                        Click to select more files or drag and drop
                       </p>
                     </div>
                   ) : (
@@ -474,87 +562,172 @@ const validateJsonTemplate = (jsonData) => {
                       <Upload size={48} className="mx-auto mb-3 opacity-50" />
                       <p className="font-medium text-lg">Click to select or drag and drop</p>
                       <p className="text-sm mt-2">Supports: JSON (Fabric.js templates), Images</p>
-                      <p className="text-xs mt-1">Maximum file size: 5MB</p>
+                      <p className="text-xs mt-1">Maximum file size: 5MB per file</p>
+                      <p className="text-xs mt-1">You can select multiple files at once</p>
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* Preview Sections */}
-              {previewImage && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Template Preview
-                  </label>
-                  <div className="border rounded-lg p-4 max-w-xs bg-white">
-                    <img
-                      src={previewImage}
-                      alt="Template preview"
-                      className="max-h-40 mx-auto object-contain"
-                    />
-                    <p className="text-xs text-gray-500 text-center mt-2">
-                      {selectedFile?.name} ({formatFileSize(selectedFile?.size)})
-                    </p>
-                  </div>
-                </div>
-              )}
+              {/* Selected Files List */}
+              {selectedFiles.length > 0 && (
+                <div className="space-y-6">
+                  <h4 className="font-medium text-gray-800">
+                    Selected Files ({selectedFiles.length})
+                  </h4>
 
-              {previewJson && (
-  <div>
-    <label className="block text-sm font-medium text-gray-700 mb-2">
-      JSON Template Info
-    </label>
-    <div className="bg-gray-50 border rounded-lg p-4">
-      <div className="flex items-center mb-2">
-        <Code size={16} className="text-green-500 mr-2" />
-        <span className="font-medium">Valid JSON Template</span>
-      </div>
-      <div className="text-sm text-gray-600 space-y-1">
-        {/* Handle both standard and custom JSON structures */}
-        <p>• Objects: {previewJson.canvasData?.objects?.length || previewJson.objects?.length || 0}</p>
-        <p>• Background: {previewJson.canvasData?.background ? 'Yes' : previewJson.background ? 'Yes' : 'No'}</p>
-        <p>• Background Image: {previewJson.canvasData?.backgroundImage ? 'Yes' : previewJson.backgroundImage ? 'Yes' : 'No'}</p>
-        <p>• Canvas Width: {previewJson.canvasData?.width || previewJson.width || 'N/A'}</p>
-        <p>• Canvas Height: {previewJson.canvasData?.height || previewJson.height || 'N/A'}</p>
-        <p>• Structure: {previewJson.canvasData ? 'Custom Wrapper' : 'Standard Fabric.js'}</p>
-      </div>
-    </div>
-  </div>
-)}
+                  {selectedFiles.map((file, index) => (
+                    <div key={file.name} className="border rounded-lg p-4 bg-white">
+                      <div className="flex gap-4">
+                        {/* Preview */}
+                        <div className="flex-shrink-0">
+                          <div className="w-24 h-24 border rounded bg-gray-50 flex items-center justify-center">
+                            {previewImages[file.name] ? (
+                              <img
+                                src={previewImages[file.name]}
+                                alt="Preview"
+                                className="max-w-full max-h-full object-contain"
+                              />
+                            ) : (
+                              <div className="text-center text-gray-400">
+                                {getFileIcon(file.type)}
+                                <p className="text-xs mt-1 capitalize">
+                                  {file.type === 'application/json' ? 'JSON' : file.type.split('/')[1]}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
 
-              {selectedFile && !previewImage && !previewJson && (
-                <div className="bg-gray-50 border rounded-lg p-4">
-                  <div className="flex items-center justify-center">
-                    {getFileIcon(selectedFile.type)}
-                    <span className="ml-2 font-medium text-gray-700">
-                      {selectedFile.name}
-                    </span>
-                  </div>
-                  <p className="text-sm text-gray-500 text-center mt-1">
-                    {formatFileSize(selectedFile.size)} • {selectedFile.type}
-                  </p>
+                        {/* File Info and Inputs */}
+                        <div className="flex-1 min-w-0 space-y-4">
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1">
+                              <p className="font-medium text-gray-900 truncate">
+                                {file.name}
+                              </p>
+                              <p className="text-sm text-gray-500">
+                                {formatFileSize(file.size)} • {file.type}
+                              </p>
+                            </div>
+                            <button
+                              onClick={() => removeSelectedFile(file.name)}
+                              className="flex-shrink-0 p-1 text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
+                              title="Remove file"
+                            >
+                              <X size={16} />
+                            </button>
+                          </div>
+
+                          {/* Template Name Input */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Template Name *
+                            </label>
+                            <input
+                              type="text"
+                              value={templateNames[file.name] || ''}
+                              onChange={(e) => updateTemplateName(file.name, e.target.value)}
+                              placeholder="Enter template name (e.g., Gold Certificate)"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            />
+                          </div>
+
+                          {/* Category Selection */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Category *
+                            </label>
+                            <select
+                              value={templateCategories[file.name] || ''}
+                              onChange={(e) => updateTemplateCategory(file.name, e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            >
+                              <option value="">Select a category</option>
+                              {defaultCategories.map((category) => (
+                                <option key={category} value={category}>
+                                  {category}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {/* Description Input */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Description
+                            </label>
+                            <textarea
+                              value={templateDescriptions[file.name] || ''}
+                              onChange={(e) => updateTemplateDescription(file.name, e.target.value)}
+                              placeholder="Brief description of the template (optional)"
+                              rows={2}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            />
+                          </div>
+
+                          {/* JSON Template Info */}
+                          {previewJsons[file.name] && (
+                            <div className="bg-gray-50 border rounded-lg p-3">
+                              <div className="flex items-center mb-2">
+                                <Code size={16} className="text-green-500 mr-2" />
+                                <span className="font-medium text-sm">Valid JSON Template</span>
+                              </div>
+                              <div className="text-xs text-gray-600 space-y-1">
+                                {/* Handle all three JSON structures */}
+                                <p>• Objects: {
+                                  previewJsons[file.name].pages?.[0]?.json?.objects?.length ||
+                                  previewJsons[file.name].canvasData?.objects?.length ||
+                                  previewJsons[file.name].objects?.length || 0
+                                }</p>
+                                <p>• Background: {
+                                  previewJsons[file.name].pages?.[0]?.json?.background ? 'Yes' :
+                                    previewJsons[file.name].canvasData?.background ? 'Yes' :
+                                      previewJsons[file.name].background ? 'Yes' : 'No'
+                                }</p>
+                                <p>• Background Image: {
+                                  previewJsons[file.name].pages?.[0]?.json?.backgroundImage ? 'Yes' :
+                                    previewJsons[file.name].canvasData?.backgroundImage ? 'Yes' :
+                                      previewJsons[file.name].backgroundImage ? 'Yes' : 'No'
+                                }</p>
+                                <p>• Structure: {
+                                  previewJsons[file.name].pages ? 'Multi-page' :
+                                    previewJsons[file.name].canvasData ? 'Custom Wrapper' :
+                                      'Standard Fabric.js'
+                                }</p>
+                                {previewJsons[file.name].pages && (
+                                  <p>• Pages: {previewJsons[file.name].pages.length}</p>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
 
               {/* Upload Button */}
-              <button
-                onClick={uploadTemplate}
-                disabled={uploading || !selectedFile || !templateName.trim() || !templateCategory}
-                className={`w-full py-3 px-4 rounded-md text-white font-medium transition-colors ${
-                  uploading || !selectedFile || !templateName.trim() || !templateCategory
-                    ? 'bg-gray-400 cursor-not-allowed'
-                    : 'bg-blue-600 hover:bg-blue-700 shadow-sm'
-                }`}
-              >
-                {uploading ? (
-                  <span className="flex items-center justify-center">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Uploading Template...
-                  </span>
-                ) : (
-                  'Upload Template'
-                )}
-              </button>
+              {selectedFiles.length > 0 && (
+                <button
+                  onClick={uploadTemplates}
+                  disabled={uploading || selectedFiles.length === 0}
+                  className={`w-full py-3 px-4 rounded-md text-white font-medium transition-colors ${uploading || selectedFiles.length === 0
+                      ? 'bg-gray-400 cursor-not-allowed'
+                      : 'bg-blue-600 hover:bg-blue-700 shadow-sm'
+                    }`}
+                >
+                  {uploading ? (
+                    <span className="flex items-center justify-center">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Uploading {selectedFiles.length} template(s)...
+                    </span>
+                  ) : (
+                    `Upload ${selectedFiles.length} Template(s)`
+                  )}
+                </button>
+              )}
 
               {/* Instructions */}
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -565,14 +738,15 @@ const validateJsonTemplate = (jsonData) => {
                   <li>• Set <code>width</code> and <code>height</code> for canvas dimensions</li>
                   <li>• Use <code>backgroundImage</code> for template backgrounds</li>
                   <li>• For images, use high-quality PNG/JPEG files</li>
-                  <li>• Maximum file size: 5MB</li>
+                  <li>• Maximum file size: 5MB per file</li>
                   <li>• Recommended canvas size: 1200x800 pixels or larger</li>
+                  <li>• You can upload multiple templates at once</li>
                 </ul>
               </div>
             </div>
           </div>
         ) : (
-          /* Manage Existing Templates */
+          /* Manage Existing Templates (unchanged) */
           <div>
             <div className="flex justify-between items-center mb-6">
               <h4 className="text-lg font-medium text-gray-800">
@@ -625,7 +799,7 @@ const validateJsonTemplate = (jsonData) => {
                         </div>
                       )}
                     </div>
-                    
+
                     <div className="p-4 bg-white">
                       <div className="flex justify-between items-start mb-2">
                         <div className="flex-1 min-w-0">
@@ -636,7 +810,7 @@ const validateJsonTemplate = (jsonData) => {
                             {template.category}
                           </span>
                         </div>
-                        
+
                         <div className="flex space-x-1 ml-2">
                           <button
                             onClick={() => previewTemplate(template)}
@@ -662,13 +836,13 @@ const validateJsonTemplate = (jsonData) => {
                           </button>
                         </div>
                       </div>
-                      
+
                       {template.description && template.description !== 'No description' && (
                         <p className="text-xs text-gray-600 mt-2 line-clamp-2" title={template.description}>
                           {template.description}
                         </p>
                       )}
-                      
+
                       <div className="flex justify-between items-center mt-3">
                         <p className="text-xs text-gray-400">
                           {formatFileSize(template.size)}

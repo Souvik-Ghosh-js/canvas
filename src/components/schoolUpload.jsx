@@ -1,16 +1,16 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "../supabase/config"; // Adjust path as needed
-import { Trash2, Download, Upload, Eye } from "lucide-react";
+import { Trash2, Download, Upload, Eye, X } from "lucide-react";
 
 const SchoolUpload = () => {
   const [activeSection, setActiveSection] = useState("upload");
   const [uploading, setUploading] = useState(false);
-  const [schoolName, setSchoolName] = useState("");
-  const [selectedFile, setSelectedFile] = useState(null);
+  const [schoolNames, setSchoolNames] = useState({}); // Object to store names for each file
+  const [selectedFiles, setSelectedFiles] = useState([]);
   const [message, setMessage] = useState({ type: "", text: "" });
   const [schools, setSchools] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [previewImage, setPreviewImage] = useState(null);
+  const [previewImages, setPreviewImages] = useState({}); // Object for preview URLs
 
   // Load school images when component mounts or when activeSection changes to manage
   useEffect(() => {
@@ -49,39 +49,70 @@ const SchoolUpload = () => {
   };
 
   const handleFileSelect = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      // Validate file type
-      const validTypes = ["image/jpeg", "image/png", "image/webp", "image/svg+xml"];
-      if (!validTypes.includes(file.type)) {
-        setMessage({ type: "error", text: "Please select a valid image file (JPEG, PNG, WebP, SVG)" });
-        setSelectedFile(null);
-        setPreviewImage(null);
-        return;
+    const files = Array.from(e.target.files);
+    if (files.length > 0) {
+      // Validate each file
+      const validFiles = [];
+      const invalidFiles = [];
+
+      files.forEach(file => {
+        // Validate file type
+        const validTypes = ["image/jpeg", "image/png", "image/webp", "image/svg+xml"];
+        if (!validTypes.includes(file.type)) {
+          invalidFiles.push(`${file.name} - Invalid file type`);
+          return;
+        }
+
+        // Validate file size (max 5MB)
+        if (file.size > 5 * 1024 * 1024) {
+          invalidFiles.push(`${file.name} - File size exceeds 5MB`);
+          return;
+        }
+
+        validFiles.push(file);
+        
+        // Generate preview
+        setPreviewImages(prev => ({
+          ...prev,
+          [file.name]: URL.createObjectURL(file)
+        }));
+
+        // Set default school name based on filename
+        const defaultName = file.name
+          .replace(/\.[^/.]+$/, "") // Remove extension
+          .replace(/[_-]/g, " ") // Replace underscores and dashes with spaces
+          .replace(/\b\w/g, l => l.toUpperCase()); // Capitalize first letter of each word
+
+        setSchoolNames(prev => ({
+          ...prev,
+          [file.name]: defaultName
+        }));
+      });
+
+      if (invalidFiles.length > 0) {
+        setMessage({ 
+          type: "error", 
+          text: `Some files were rejected:\n${invalidFiles.join('\n')}` 
+        });
       }
 
-      // Validate file size (max 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        setMessage({ type: "error", text: "File size must be less than 5MB" });
-        setSelectedFile(null);
-        setPreviewImage(null);
-        return;
+      if (validFiles.length > 0) {
+        setSelectedFiles(prev => [...prev, ...validFiles]);
+        setMessage({ type: "", text: "" });
       }
-
-      setSelectedFile(file);
-      setPreviewImage(URL.createObjectURL(file));
-      setMessage({ type: "", text: "" });
     }
   };
 
-  const uploadSchoolImage = async () => {
-    if (!selectedFile) {
-      setMessage({ type: "error", text: "Please select a file to upload" });
+  const uploadSchoolImages = async () => {
+    if (selectedFiles.length === 0) {
+      setMessage({ type: "error", text: "Please select files to upload" });
       return;
     }
 
-    if (!schoolName.trim()) {
-      setMessage({ type: "error", text: "Please enter a school name" });
+    // Check if all files have school names
+    const missingNames = selectedFiles.filter(file => !schoolNames[file.name]?.trim());
+    if (missingNames.length > 0) {
+      setMessage({ type: "error", text: "Please enter school names for all files" });
       return;
     }
 
@@ -89,69 +120,107 @@ const SchoolUpload = () => {
     setMessage({ type: "", text: "" });
 
     try {
-      // Create a sanitized filename
-      const fileExtension = selectedFile.name.split('.').pop();
-      const sanitizedName = schoolName
-        .toLowerCase()
-        .replace(/[^a-z0-9]/g, '_')
-        .replace(/_+/g, '_');
-      const fileName = `${sanitizedName}.${fileExtension}`;
+      const uploadPromises = selectedFiles.map(async (file) => {
+        const schoolName = schoolNames[file.name].trim();
+        
+        // Create a sanitized filename
+        const fileExtension = file.name.split('.').pop();
+        const sanitizedName = schoolName
+          .toLowerCase()
+          .replace(/[^a-z0-9]/g, '_')
+          .replace(/_+/g, '_');
+        const fileName = `${sanitizedName}.${fileExtension}`;
 
-      // Upload to Supabase storage
-      const { data, error } = await supabase.storage
-        .from('schools')
-        .upload(fileName, selectedFile, {
-          cacheControl: '3600',
-          upsert: false
-        });
+        // Upload to Supabase storage
+        const { data, error } = await supabase.storage
+          .from('schools')
+          .upload(fileName, file, {
+            cacheControl: '3600',
+            upsert: false
+          });
 
-      if (error) {
-        if (error.message === 'The resource already exists') {
-          setMessage({ type: "error", text: "A school with this name already exists. Please use a different name." });
-        } else {
-          throw error;
+        if (error) {
+          if (error.message === 'The resource already exists') {
+            throw new Error(`"${schoolName}" already exists. Please use a different name.`);
+          } else {
+            throw error;
+          }
         }
-        return;
+
+        return { fileName, schoolName };
+      });
+
+      const results = await Promise.allSettled(uploadPromises);
+      
+      const successfulUploads = results.filter(result => result.status === 'fulfilled');
+      const failedUploads = results.filter(result => result.status === 'rejected');
+
+      if (failedUploads.length > 0) {
+        const errorMessages = failedUploads.map((result, index) => 
+          `${selectedFiles[index]?.name}: ${result.reason.message}`
+        );
+        
+        if (successfulUploads.length > 0) {
+          setMessage({ 
+            type: "warning", 
+            text: `Some files uploaded successfully, but ${failedUploads.length} failed:\n${errorMessages.join('\n')}` 
+          });
+        } else {
+          setMessage({ 
+            type: "error", 
+            text: `Upload failed:\n${errorMessages.join('\n')}` 
+          });
+        }
+      } else {
+        setMessage({ 
+          type: "success", 
+          text: `Successfully uploaded ${selectedFiles.length} school image(s)!` 
+        });
       }
 
-      setMessage({ type: "success", text: "School image uploaded successfully!" });
-      setSchoolName("");
-      setSelectedFile(null);
-      setPreviewImage(null);
-      document.getElementById('school-file-input').value = "";
+      // Reset form only if all uploads were successful
+      if (failedUploads.length === 0) {
+        setSelectedFiles([]);
+        setSchoolNames({});
+        setPreviewImages({});
+        document.getElementById('school-file-input').value = "";
+      }
 
-      // Reload the school images list
-      loadSchoolImages();
+      // Reload the school images list if any uploads were successful
+      if (successfulUploads.length > 0) {
+        loadSchoolImages();
+      }
 
     } catch (error) {
-      console.error('Error uploading school image:', error);
+      console.error('Error uploading school images:', error);
       setMessage({ type: "error", text: `Upload failed: ${error.message}` });
     } finally {
       setUploading(false);
     }
   };
 
-  const deleteSchoolImage = async (fileName) => {
-    if (!window.confirm('Are you sure you want to delete this school image? This action cannot be undone.')) {
-      return;
-    }
+  const removeSelectedFile = (fileName) => {
+    setSelectedFiles(prev => prev.filter(file => file.name !== fileName));
+    setSchoolNames(prev => {
+      const newNames = { ...prev };
+      delete newNames[fileName];
+      return newNames;
+    });
+    setPreviewImages(prev => {
+      const newPreviews = { ...prev };
+      if (newPreviews[fileName]) {
+        URL.revokeObjectURL(newPreviews[fileName]);
+        delete newPreviews[fileName];
+      }
+      return newPreviews;
+    });
+  };
 
-    try {
-      const { error } = await supabase.storage
-        .from('schools')
-        .remove([fileName]);
-
-      if (error) throw error;
-
-      setSchools(prev => prev.filter(school => school.name !== fileName));
-      setMessage({ type: "success", text: "School image deleted successfully!" });
-      
-      // Clear message after 3 seconds
-      setTimeout(() => setMessage({ type: "", text: "" }), 3000);
-    } catch (error) {
-      console.error('Error deleting school image:', error);
-      setMessage({ type: "error", text: "Failed to delete school image" });
-    }
+  const updateSchoolName = (fileName, name) => {
+    setSchoolNames(prev => ({
+      ...prev,
+      [fileName]: name
+    }));
   };
 
   const handleDragOver = (e) => {
@@ -163,10 +232,9 @@ const SchoolUpload = () => {
     e.preventDefault();
     e.stopPropagation();
     
-    const files = e.dataTransfer.files;
+    const files = Array.from(e.dataTransfer.files);
     if (files.length > 0) {
-      const file = files[0];
-      const inputEvent = { target: { files: [file] } };
+      const inputEvent = { target: { files } };
       handleFileSelect(inputEvent);
     }
   };
@@ -205,7 +273,7 @@ const SchoolUpload = () => {
           }`}
         >
           <Upload size={18} className="mr-2" />
-          Upload New
+          Upload New {selectedFiles.length > 0 && `(${selectedFiles.length})`}
         </button>
         <button
           onClick={() => setActiveSection("manage")}
@@ -225,9 +293,11 @@ const SchoolUpload = () => {
         {/* Message Display */}
         {message.text && (
           <div
-            className={`mb-6 p-4 rounded-lg ${
+            className={`mb-6 p-4 rounded-lg whitespace-pre-line ${
               message.type === 'error'
                 ? 'bg-red-100 border border-red-200 text-red-700'
+                : message.type === 'warning'
+                ? 'bg-yellow-100 border border-yellow-200 text-yellow-700'
                 : 'bg-green-100 border border-green-200 text-green-700'
             }`}
           >
@@ -237,35 +307,18 @@ const SchoolUpload = () => {
 
         {activeSection === "upload" ? (
           /* Upload Form */
-          <div className="max-w-2xl">
+          <div className="max-w-4xl">
             <div className="space-y-6">
-              {/* School Name Input */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  School Name *
-                </label>
-                <input
-                  type="text"
-                  value={schoolName}
-                  onChange={(e) => setSchoolName(e.target.value)}
-                  placeholder="Enter school name (e.g., Sunrise Academy)"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  This will be used to generate the filename and display name
-                </p>
-              </div>
-
               {/* File Upload Area */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  School Logo/Image *
+                  School Logos/Images *
                 </label>
                 <div
                   onDragOver={handleDragOver}
                   onDrop={handleDrop}
                   className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-all ${
-                    selectedFile 
+                    selectedFiles.length > 0
                       ? 'border-green-500 bg-green-50' 
                       : 'border-gray-300 hover:border-gray-400 bg-gray-50'
                   }`}
@@ -277,14 +330,14 @@ const SchoolUpload = () => {
                     accept="image/jpeg,image/png,image/webp,image/svg+xml"
                     onChange={handleFileSelect}
                     className="hidden"
+                    multiple
                   />
                   
-                  {selectedFile ? (
+                  {selectedFiles.length > 0 ? (
                     <div className="text-green-600">
-                      <p className="font-medium text-lg">✓ File Selected</p>
-                      <p className="text-sm mt-2">{selectedFile.name}</p>
-                      <p className="text-xs text-gray-500 mt-2">
-                        Click to select a different file or drag and drop
+                      <p className="font-medium text-lg">✓ {selectedFiles.length} File(s) Selected</p>
+                      <p className="text-sm mt-2">
+                        Click to select more files or drag and drop
                       </p>
                     </div>
                   ) : (
@@ -292,67 +345,120 @@ const SchoolUpload = () => {
                       <Upload size={48} className="mx-auto mb-3 opacity-50" />
                       <p className="font-medium text-lg">Click to select or drag and drop</p>
                       <p className="text-sm mt-2">Supports: JPEG, PNG, WebP, SVG</p>
-                      <p className="text-xs mt-1">Maximum file size: 5MB</p>
+                      <p className="text-xs mt-1">Maximum file size: 5MB per file</p>
+                      <p className="text-xs mt-1">You can select multiple files at once</p>
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* Preview */}
-              {previewImage && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Preview
-                  </label>
-                  <div className="border rounded-lg p-4 max-w-xs bg-white">
-                    <img
-                      src={previewImage}
-                      alt="Preview"
-                      className="max-h-40 mx-auto object-contain"
-                    />
-                    <p className="text-xs text-gray-500 text-center mt-2">
-                      {selectedFile?.name} ({formatFileSize(selectedFile?.size)})
-                    </p>
-                  </div>
+              {/* Selected Files List */}
+              {selectedFiles.length > 0 && (
+                <div className="space-y-4">
+                  <h4 className="font-medium text-gray-800">
+                    Selected Files ({selectedFiles.length})
+                  </h4>
+                  
+                  {selectedFiles.map((file, index) => (
+                    <div key={file.name} className="border rounded-lg p-4 bg-white">
+                      <div className="flex gap-4">
+                        {/* Preview */}
+                        <div className="flex-shrink-0">
+                          <div className="w-20 h-20 border rounded bg-gray-50 flex items-center justify-center">
+                            {previewImages[file.name] ? (
+                              <img
+                                src={previewImages[file.name]}
+                                alt="Preview"
+                                className="max-w-full max-h-full object-contain"
+                              />
+                            ) : (
+                              <span className="text-gray-400 text-xs">No preview</span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* File Info and Input */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex justify-between items-start mb-3">
+                            <div className="flex-1">
+                              <p className="font-medium text-gray-900 truncate">
+                                {file.name}
+                              </p>
+                              <p className="text-sm text-gray-500">
+                                {formatFileSize(file.size)}
+                              </p>
+                            </div>
+                            <button
+                              onClick={() => removeSelectedFile(file.name)}
+                              className="flex-shrink-0 p-1 text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
+                              title="Remove file"
+                            >
+                              <X size={16} />
+                            </button>
+                          </div>
+
+                          {/* School Name Input */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              School Name for this image *
+                            </label>
+                            <input
+                              type="text"
+                              value={schoolNames[file.name] || ''}
+                              onChange={(e) => updateSchoolName(file.name, e.target.value)}
+                              placeholder="Enter school name (e.g., Sunrise Academy)"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            />
+                            <p className="text-xs text-gray-500 mt-1">
+                              This will be used as the display name and filename
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
 
               {/* Upload Button */}
-              <button
-                onClick={uploadSchoolImage}
-                disabled={uploading || !selectedFile || !schoolName.trim()}
-                className={`w-full py-3 px-4 rounded-md text-white font-medium transition-colors ${
-                  uploading || !selectedFile || !schoolName.trim()
-                    ? 'bg-gray-400 cursor-not-allowed'
-                    : 'bg-blue-600 hover:bg-blue-700 shadow-sm'
-                }`}
-              >
-                {uploading ? (
-                  <span className="flex items-center justify-center">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Uploading...
-                  </span>
-                ) : (
-                  'Upload School Image'
-                )}
-              </button>
+              {selectedFiles.length > 0 && (
+                <button
+                  onClick={uploadSchoolImages}
+                  disabled={uploading || selectedFiles.length === 0}
+                  className={`w-full py-3 px-4 rounded-md text-white font-medium transition-colors ${
+                    uploading || selectedFiles.length === 0
+                      ? 'bg-gray-400 cursor-not-allowed'
+                      : 'bg-blue-600 hover:bg-blue-700 shadow-sm'
+                  }`}
+                >
+                  {uploading ? (
+                    <span className="flex items-center justify-center">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Uploading {selectedFiles.length} file(s)...
+                    </span>
+                  ) : (
+                    `Upload ${selectedFiles.length} School Image(s)`
+                  )}
+                </button>
+              )}
 
               {/* Instructions */}
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <h4 className="font-medium text-blue-800 mb-2">Upload Guidelines:</h4>
                 <ul className="text-sm text-blue-700 space-y-1">
-                  <li>• Enter the complete school name as it should appear to users</li>
+                  <li>• Enter the complete school name for each file as it should appear to users</li>
                   <li>• Use high-quality logos or images with transparent backgrounds</li>
                   <li>• Recommended size: 300x300 pixels or larger (square aspect ratio)</li>
                   <li>• Supported formats: JPEG, PNG, WebP, SVG</li>
-                  <li>• Maximum file size: 5MB</li>
+                  <li>• Maximum file size: 5MB per file</li>
                   <li>• File names will be automatically generated from school names</li>
+                  <li>• You can upload multiple school images at once</li>
                 </ul>
               </div>
             </div>
           </div>
         ) : (
-          /* Manage Existing Images */
+          /* Manage Existing Images (unchanged) */
           <div>
             <div className="flex justify-between items-center mb-6">
               <h4 className="text-lg font-medium text-gray-800">

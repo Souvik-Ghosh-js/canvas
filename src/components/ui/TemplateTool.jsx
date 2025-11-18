@@ -60,25 +60,45 @@ const TemplateTool = ({ onTemplateSelect, canvas }) => {
     setThumbnailLoading(loadingStates);
   };
 
-  const handleTemplateClick = async (template) => {
-    if (!canvas) {
-      console.error('Canvas not available');
-      return;
-    }
+const handleTemplateClick = async (template) => {
+  if (!canvas) {
+    console.error('Canvas not available');
+    return;
+  }
 
-    try {
-      // Apply template to canvas
-      await applyTemplateToCanvas(canvas, template);
-      
-      // Notify parent component
-      if (onTemplateSelect) {
-        onTemplateSelect(template);
-      }
-    } catch (error) {
-      console.error('Error applying template:', error);
-      alert('Failed to apply template. Please try again.');
+  console.log('Applying template:', {
+    name: template.name,
+    type: template.type,
+    structure: template.jsonData?.pages ? 'multi-page' : 
+               template.jsonData?.canvasData ? 'canvasData' : 
+               'standard'
+  });
+
+  try {
+    // Apply template to canvas
+    await applyTemplateToCanvas(canvas, template);
+    
+    console.log('Template applied successfully');
+    
+    // Notify parent component
+    if (onTemplateSelect) {
+      onTemplateSelect(template);
     }
-  };
+  } catch (error) {
+    console.error('Error applying template:', error);
+    
+    // More detailed error message
+    let errorMessage = 'Failed to apply template. Please try again.';
+    
+    if (error.message.includes('Invalid template structure')) {
+      errorMessage = 'This template has an invalid structure and cannot be loaded.';
+    } else if (error.message.includes('loadFromJSON')) {
+      errorMessage = 'Error loading template data. The file may be corrupted.';
+    }
+    
+    alert(errorMessage);
+  }
+};
 
   const getFallbackThumbnail = (template) => {
     if (template.type === 'application/json') {

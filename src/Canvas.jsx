@@ -195,23 +195,30 @@ function App() {
   };
 
   // Updated template handler function
-  const handleTemplateSelect = async (template) => {
-    try {
-      // Save current state for undo/redo
-      const originalState = canvas.toJSON();
+const handleTemplateSelect = async (template) => {
+  try {
+    console.log('Applying template:', template.name);
+    
+    // Apply the template
+    await applyTemplateToCanvas(canvas, template);
 
-      // Apply the template
-      await applyTemplateToCanvas(canvas, template);
+    // Force multiple re-renders and state updates
+    canvas.renderAll();
+    canvas.requestRenderAll();
 
-      // Close the modal
+    // Force a state update to trigger React re-render
+    setCanvasList(prev => [...prev]);
+
+    // Close the modal after a small delay to ensure rendering is complete
+    setTimeout(() => {
       setIsModalOpen(false);
+    }, 100);
 
-    } catch (error) {
-      console.error('Failed to apply template:', error);
-      alert('Failed to load template. Please try again.');
-    }
-  };
-
+  } catch (error) {
+    console.error('Failed to apply template:', error);
+    alert('Failed to load template. Please try again.');
+  }
+};
   // Open export modals
   const handleOpenProjectExport = () => {
     setExportProjectName(currentProject?.project_name || "My Design");

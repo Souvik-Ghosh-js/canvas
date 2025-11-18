@@ -46,12 +46,16 @@ export const getTemplatesFromBucket = async () => {
                 const jsonData = await response.json();
                 templateData.jsonData = jsonData;
 
-                // Extract preview image from both standard and custom structures
+                // Extract preview image from all three structures
                 if (jsonData.backgroundImage) {
+                  // Standard Fabric.js structure
                   templateData.previewUrl = jsonData.backgroundImage;
                 } else if (jsonData.canvasData?.backgroundImage) {
-                  // Handle your custom structure
+                  // Custom wrapper structure
                   templateData.previewUrl = jsonData.canvasData.backgroundImage;
+                } else if (jsonData.pages?.[0]?.json?.backgroundImage) {
+                  // Multi-page structure
+                  templateData.previewUrl = jsonData.pages[0].json.backgroundImage;
                 }
               }
             } catch (e) {
@@ -105,8 +109,7 @@ const extractMetadataFromFileName = (fileName) => {
 export const applyTemplateToCanvas = async (canvas, template) => {
   return new Promise(async (resolve, reject) => {
     try {
-      // Clear the canvas first
-      canvas.clear();
+      console.log('Starting template application for:', template.name);
 
       if (template.type === 'application/json' && template.jsonData) {
         // Handle JSON template (Fabric.js format)
@@ -119,7 +122,13 @@ export const applyTemplateToCanvas = async (canvas, template) => {
         await applyImageTemplateToCanvas(canvas, template.url);
       }
 
+      // Final re-render to ensure everything is visible
       canvas.renderAll();
+      
+      // Force a canvas refresh
+      canvas.requestRenderAll();
+      
+      console.log('Template application completed');
       resolve();
     } catch (error) {
       console.error('Error applying template:', error);
@@ -131,8 +140,38 @@ export const applyTemplateToCanvas = async (canvas, template) => {
 const applyJsonTemplateToCanvas = (canvas, jsonData) => {
   return new Promise((resolve, reject) => {
     try {
-      // Handle both standard Fabric.js and custom wrapper formats
-      const templateData = jsonData.canvasData || jsonData;
+      // Handle all three JSON structures
+      let templateData;
+      
+      if (jsonData.pages && jsonData.pages.length > 0 && jsonData.pages[0].json) {
+        // Structure 3: Multi-page format - use first page's json
+        console.log('Applying multi-page template, using first page');
+        templateData = jsonData.pages[0].json;
+      } else if (jsonData.canvasData) {
+        // Structure 2: Custom wrapper format
+        console.log('Applying canvasData template');
+        templateData = jsonData.canvasData;
+      } else {
+        // Structure 1: Standard Fabric.js format
+        console.log('Applying standard Fabric.js template');
+        templateData = jsonData;
+      }
+      
+      // Validate that we have valid template data
+      if (!templateData || (!templateData.objects && !templateData.background && !templateData.backgroundImage)) {
+        throw new Error('Invalid template structure: No canvas data found');
+      }
+
+      console.log('Template data to load:', {
+        objectsCount: templateData.objects?.length || 0,
+        hasBackground: !!templateData.background,
+        hasBackgroundImage: !!templateData.backgroundImage,
+        width: templateData.width,
+        height: templateData.height
+      });
+
+      // Clear the canvas first
+      canvas.clear();
       
       // Load the JSON template into the canvas
       canvas.loadFromJSON(templateData, () => {
@@ -142,14 +181,33 @@ const applyJsonTemplateToCanvas = (canvas, jsonData) => {
           canvas.setHeight(templateData.height);
         }
 
+        console.log('Template applied successfully');
+        
+        // Force multiple re-renders to ensure everything is visible
         canvas.renderAll();
-        resolve();
+        
+        // Additional re-render after a small delay to catch any async rendering issues
+        setTimeout(() => {
+          canvas.renderAll();
+        }, 50);
+        
+        // One more render for good measure
+        requestAnimationFrame(() => {
+          canvas.renderAll();
+          resolve();
+        });
+      }, (error) => {
+        console.error('Error in canvas.loadFromJSON callback:', error);
+        reject(error);
       });
     } catch (error) {
+      console.error('Error in applyJsonTemplateToCanvas:', error);
       reject(error);
     }
   });
 };
+
+
 const applyImageTemplateToCanvas = (canvas, imageUrl) => {
   return new Promise((resolve, reject) => {
     fabric.Image.fromURL(imageUrl, (img) => {
@@ -214,12 +272,31 @@ const createJsonTemplateThumbnail = async (jsonData) => {
         backgroundColor: '#f8f9fa'
       });
 
+      // Handle all three JSON structures
+      let templateData;
+      
+      if (jsonData.pages && jsonData.pages.length > 0 && jsonData.pages[0].json) {
+        templateData = jsonData.pages[0].json;
+      } else if (jsonData.canvasData) {
+        templateData = jsonData.canvasData;
+      } else {
+        templateData = jsonData;
+      }
+
+      // Check if we have valid data to load
+      if (!templateData || (!templateData.objects && !templateData.background && !templateData.backgroundImage)) {
+        console.warn('No valid template data for thumbnail');
+        canvas.dispose();
+        resolve(null);
+        return;
+      }
+
       // Load the JSON template
-      canvas.loadFromJSON(jsonData, () => {
+      canvas.loadFromJSON(templateData, () => {
         try {
           // Scale to fit thumbnail
-          const originalWidth = jsonData.width || 800;
-          const originalHeight = jsonData.height || 600;
+          const originalWidth = templateData.width || 800;
+          const originalHeight = templateData.height || 600;
           const scale = Math.min(200 / originalWidth, 150 / originalHeight) * 0.8;
 
           canvas.setZoom(scale);
@@ -238,6 +315,10 @@ const createJsonTemplateThumbnail = async (jsonData) => {
           canvas.dispose();
           resolve(null);
         }
+      }, (error) => {
+        console.error('Error loading JSON for thumbnail:', error);
+        canvas.dispose();
+        resolve(null);
       });
     } catch (error) {
       console.error('Error creating JSON thumbnail:', error);
