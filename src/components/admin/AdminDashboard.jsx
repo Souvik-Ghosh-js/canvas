@@ -2,9 +2,10 @@ import React, { useState } from "react";
 import { LogOut } from "lucide-react";
 import LogoUpload from "./LogoUpload";
 import BackgroundUpload from "./Background";
-import SchoolUpload from "../../components/schoolUpload"; // We'll create this component
+import SchoolUpload from "../../components/schoolUpload";
 import TemplateUpload from "../../components/templateUpload";
-// In AdminDashboard.js, update the tabs and content:
+import ElementsUpload from "../../components/elementupload"; // Add this import
+
 const AdminDashboard = ({ onLogout }) => {
   const [activeTab, setActiveTab] = useState("logo");
 
@@ -22,7 +23,7 @@ const AdminDashboard = ({ onLogout }) => {
           </button>
         </div>
         <nav className="flex md:flex-col">
-          {["logo", "background", "school", "template"].map((tab) => (
+          {["logo", "background", "school", "template", "elements"].map((tab) => ( // Add "elements" to the tabs
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -33,7 +34,8 @@ const AdminDashboard = ({ onLogout }) => {
               }`}
             >
               {tab === "school" ? "School Names" : 
-               tab === "template" ? "Templates" : tab}
+               tab === "template" ? "Templates" : 
+               tab === "elements" ? "Elements" : tab} {/* Add elements label */}
             </button>
           ))}
         </nav>
@@ -45,6 +47,7 @@ const AdminDashboard = ({ onLogout }) => {
         {activeTab === "background" && <BackgroundUpload />}
         {activeTab === "school" && <SchoolUpload />}
         {activeTab === "template" && <TemplateUpload />}
+        {activeTab === "elements" && <ElementsUpload />} {/* Add ElementsUpload component */}
       </div>
     </div>
   );

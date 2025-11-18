@@ -70,6 +70,11 @@ function ToolBar() {
             icon={<FaUpload />}
             onToolClick={handleNavClick}
           />
+          <ToolButton
+            text="Elements"
+            icon={<FaShapes />}
+            onToolClick={handleNavClick}
+          />
         </section>
       </section>
     </div>

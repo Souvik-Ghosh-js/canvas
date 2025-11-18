@@ -6,8 +6,10 @@ import TextTool from "./components/ui/TextTool";
 import ImageTool from "./components/ui/ImageTool";
 import ShapeTool from "./components/ui/ShapeTool";
 import Settings from "./components/Settings";
+import ElementTool from "./components/ui/ElementTool";
 import BGTool from "./components/ui/BGTool";
 import LogoTool from "./components/ui/LogoTool";
+import {addElement} from "./utils/addElement.js";
 import UploadTool from "./components/ui/UploadTool";
 import SchoolNameTool from "./components/ui/SchoolNameTool";
 import TemplateTool from "./components/ui/TemplateTool.jsx";
@@ -54,7 +56,7 @@ import {
 
 import { Circle, Rect, Textbox } from "fabric";
 import useHistory from "./hooks/useUndoRedo";
-import { Redo, Undo, Plus, Copy, Trash2 } from "lucide-react";
+import { Redo, Undo, Plus, Copy, Trash2, Menu, X } from "lucide-react";
 import { exportMultipleJsonToPDF } from "./utils/exportMultiPagePDF";
 import { sendEmail } from "./utils/emailService";
 
@@ -315,6 +317,8 @@ function App() {
     addWordArt_6: () => tools.addWordArt_6(canvas),
     addWordArt_7: () => tools.addWordArt_7(canvas),
     applyTemplate: (template) => applyTemplateToCanvas(canvas, template),
+    addElement: (url) => addElement(canvas, url), // Add this line
+
   };
 
   const addSchoolNameText = (text) => {
@@ -465,8 +469,8 @@ function App() {
 
       {/* Project Export Modal */}
       {isProjectExportModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 w-96 shadow-2xl">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-2xl">
             <h3 className="text-lg font-bold mb-4 text-gray-800">Export Project as JSON</h3>
             <div className="mb-4">
               <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -505,8 +509,8 @@ function App() {
 
       {/* Page Export Modal */}
       {isPageExportModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 w-96 shadow-2xl">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-2xl">
             <h3 className="text-lg font-bold mb-4 text-gray-800">Export Page as JSON</h3>
             <div className="mb-4">
               <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -563,11 +567,11 @@ function App() {
 
       {/* Page Management Section */}
       <section className="bg-white/80 backdrop-blur-sm border-b border-gray-200/50 px-3 py-2">
-        <div className="flex flex-wrap gap-2 items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
           {/* Action Buttons */}
-          <div className="flex gap-2 items-center">
+          <div className="flex gap-2 items-center justify-center sm:justify-start overflow-x-auto pb-1 sm:pb-0">
             <button
-              className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white px-3 py-2 rounded-lg font-semibold transition-all duration-200 flex items-center gap-2 shadow-md hover:shadow-lg"
+              className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white px-3 py-2 rounded-lg font-semibold transition-all duration-200 flex items-center gap-2 shadow-md hover:shadow-lg whitespace-nowrap flex-shrink-0"
               onClick={() => {
                 createNewPage({
                   canvas,
@@ -580,11 +584,11 @@ function App() {
               title="Create New Page"
             >
               <Plus size={16} />
-              <span className="hidden xs:inline">New Page</span>
+              <span>New Page</span>
             </button>
 
             <button
-              className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white px-3 py-2 rounded-lg font-semibold transition-all duration-200 flex items-center gap-2 shadow-md hover:shadow-lg"
+              className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white px-3 py-2 rounded-lg font-semibold transition-all duration-200 flex items-center gap-2 shadow-md hover:shadow-lg whitespace-nowrap flex-shrink-0"
               onClick={() => {
                 duplicateCurrentPage({
                   canvas,
@@ -597,11 +601,11 @@ function App() {
               title="Duplicate Current Page"
             >
               <Copy size={16} />
-              <span className="hidden xs:inline">Duplicate</span>
+              <span>Duplicate</span>
             </button>
 
             <button
-              className="bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white px-3 py-2 rounded-lg font-semibold transition-all duration-200 flex items-center gap-2 shadow-md hover:shadow-lg"
+              className="bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white px-3 py-2 rounded-lg font-semibold transition-all duration-200 flex items-center gap-2 shadow-md hover:shadow-lg whitespace-nowrap flex-shrink-0"
               onClick={() => {
                 deletePage({
                   canvas,
@@ -614,12 +618,12 @@ function App() {
               title="Delete Current Page"
             >
               <Trash2 size={16} />
-              <span className="hidden xs:inline">Delete</span>
+              <span>Delete</span>
             </button>
           </div>
 
           {/* Page Selector and Controls */}
-          <div className="flex gap-3 items-center">
+          <div className="flex gap-3 items-center justify-center sm:justify-end overflow-x-auto pb-1 sm:pb-0">
             {/* Page Selector */}
             <select
               value={activePage}
@@ -627,7 +631,7 @@ function App() {
                 const pageId = Number(e.target.value);
                 switchPage(pageId);
               }}
-              className="border border-gray-300 px-3 py-2 rounded-lg text-sm bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all min-w-[100px] font-medium"
+              className="border border-gray-300 px-3 py-2 rounded-lg text-sm bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all min-w-[100px] font-medium flex-shrink-0"
               title="Select Page"
             >
               {canvasList.map((page, index) => (
@@ -638,7 +642,7 @@ function App() {
             </select>
 
             {/* Undo/Redo Buttons */}
-            <div className="flex gap-1 border-l border-gray-300 pl-3">
+            <div className="flex gap-1 border-l border-gray-300 pl-3 flex-shrink-0">
               <button
                 className="p-2 cursor-pointer hover:bg-gray-100 rounded-lg transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent border border-gray-200"
                 disabled={!canUndo}
@@ -658,7 +662,7 @@ function App() {
             </div>
 
             {/* Zoom Bar */}
-            <div className="min-w-[120px]">
+            <div className="min-w-[120px] flex-shrink-0">
               <ZoomBar zoom={zoom} setZoom={handleZoomChange} />
             </div>
           </div>
@@ -669,7 +673,7 @@ function App() {
       {canvasList.length > 1 && (
         <section className="bg-white/80 backdrop-blur-sm border-b border-gray-200/50 px-3 py-2">
           <div className="flex items-center gap-3 overflow-x-auto">
-            <span className="text-sm font-semibold text-gray-700 whitespace-nowrap">
+            <span className="text-sm font-semibold text-gray-700 whitespace-nowrap flex-shrink-0">
               Pages:
             </span>
             <div className="flex gap-2 pb-1">
@@ -677,7 +681,7 @@ function App() {
                 <button
                   key={page.id}
                   onClick={() => switchPage(page.id)}
-                  className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-all duration-200 min-w-[90px] shadow-sm ${
+                  className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-all duration-200 min-w-[90px] shadow-sm flex-shrink-0 ${
                     activePage === page.id
                       ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-md"
                       : "bg-white text-gray-700 hover:bg-gray-50 border border-gray-200 hover:border-gray-300"
@@ -692,99 +696,66 @@ function App() {
       )}
 
       {/* Main Toolbar */}
-      <section className="w-full bg-white/90 backdrop-blur-sm border-b border-gray-200/50 flex flex-col sm:flex-row justify-between items-center px-4 py-3">
+      <section className="w-full bg-white/90 backdrop-blur-sm border-b border-gray-200/50 flex justify-between items-center px-4 py-3">
         {/* Mobile Menu Button */}
         <button
-          className="md:hidden p-2 hover:bg-gray-100 rounded-lg transition-colors mb-2 sm:mb-0"
+          className="md:hidden p-2 hover:bg-gray-100 rounded-lg transition-colors"
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           title="Tools Menu"
         >
-          <div className="flex flex-col gap-1">
-            <div className="w-6 h-0.5 bg-gray-600"></div>
-            <div className="w-6 h-0.5 bg-gray-600"></div>
-            <div className="w-6 h-0.5 bg-gray-600"></div>
-          </div>
+          {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
 
-        {/* Tool Icons */}
-        <section className="flex items-center gap-1 sm:gap-2 md:gap-3 flex-1 justify-center md:justify-start">
-          {/* Mobile Toolbar */}
-          <div className={`flex gap-2 overflow-x-auto py-1 md:hidden scrollbar-hide transition-all duration-300 ${
-            mobileMenuOpen ? 'max-w-full opacity-100' : 'max-w-0 opacity-0 overflow-hidden'
-          }`}>
+        {/* Tool Icons - Desktop */}
+        <section className="hidden md:flex items-center gap-2 lg:gap-3">
+          {[
+            { id: "Text", icon: FaTextHeight, color: "blue" },
+            { id: "Images", icon: IoImagesSharp, color: "green" },
+            { id: "Shapes", icon: FaShapes, color: "purple" },
+            { id: "Background", icon: FaPaintBrush, color: "orange" },
+            { id: "School Logo", icon: FaIcons, color: "red" },
+            { id: "School Name", icon: FaBuilding, color: "teal" },
+            { id: "Upload", icon: FaUpload, color: "gray" },
+            { id: "Templates", icon: FaLayerGroup, color: "indigo" },
+          ].map(({ id, icon: Icon, color }) => (
             <button
-              onClick={() => handleNavClick("Text")}
-              className="p-3 hover:bg-blue-50 rounded-xl transition-all duration-200 border border-transparent hover:border-blue-200 hover:shadow-sm flex flex-col items-center gap-1 min-w-[60px]"
-              title="Text"
+              key={id}
+              onClick={() => handleNavClick(id)}
+              className={`p-3 hover:bg-${color}-50 rounded-xl transition-all duration-200 border border-transparent hover:border-${color}-200 hover:shadow-sm group`}
+              title={id}
             >
-              <FaTextHeight className="text-xl text-blue-600" />
-              <span className="text-xs text-gray-600">Text</span>
+              <Icon className={`text-xl text-${color}-600 group-hover:scale-110 transition-transform`} />
             </button>
-            <button
-              onClick={() => handleNavClick("Images")}
-              className="p-3 hover:bg-green-50 rounded-xl transition-all duration-200 border border-transparent hover:border-green-200 hover:shadow-sm flex flex-col items-center gap-1 min-w-[60px]"
-              title="Images"
-            >
-              <IoImagesSharp className="text-xl text-green-600" />
-              <span className="text-xs text-gray-600">Images</span>
-            </button>
-            <button
-              onClick={() => handleNavClick("Shapes")}
-              className="p-3 hover:bg-purple-50 rounded-xl transition-all duration-200 border border-transparent hover:border-purple-200 hover:shadow-sm flex flex-col items-center gap-1 min-w-[60px]"
-              title="Shapes"
-            >
-              <FaShapes className="text-xl text-purple-600" />
-              <span className="text-xs text-gray-600">Shapes</span>
-            </button>
-            <button
-              onClick={() => handleNavClick("Background")}
-              className="p-3 hover:bg-orange-50 rounded-xl transition-all duration-200 border border-transparent hover:border-orange-200 hover:shadow-sm flex flex-col items-center gap-1 min-w-[60px]"
-              title="Background"
-            >
-              <FaPaintBrush className="text-xl text-orange-600" />
-              <span className="text-xs text-gray-600">BG</span>
-            </button>
-            <button
-              onClick={() => handleNavClick("Templates")}
-              className="p-3 hover:bg-indigo-50 rounded-xl transition-all duration-200 border border-transparent hover:border-indigo-200 hover:shadow-sm flex flex-col items-center gap-1 min-w-[60px]"
-              title="Templates"
-            >
-              <FaLayerGroup className="text-xl text-indigo-600" />
-              <span className="text-xs text-gray-600">Templates</span>
-            </button>
-          </div>
+          ))}
+        </section>
 
-          {/* Desktop Toolbar */}
-          <section className="hidden md:flex gap-2 lg:gap-3">
-            {[
-              { id: "Text", icon: FaTextHeight, color: "blue" },
-              { id: "Images", icon: IoImagesSharp, color: "green" },
-              { id: "Shapes", icon: FaShapes, color: "purple" },
-              { id: "Background", icon: FaPaintBrush, color: "orange" },
-              { id: "School Logo", icon: FaIcons, color: "red" },
-              { id: "School Name", icon: FaBuilding, color: "teal" },
-              { id: "Upload", icon: FaUpload, color: "gray" },
-              { id: "Templates", icon: FaLayerGroup, color: "indigo" },
-            ].map(({ id, icon: Icon, color }) => (
-              <button
-                key={id}
-                onClick={() => handleNavClick(id)}
-                className={`p-3 hover:bg-${color}-50 rounded-xl transition-all duration-200 border border-transparent hover:border-${color}-200 hover:shadow-sm group`}
-                title={id}
-              >
-                <Icon className={`text-xl text-${color}-600 group-hover:scale-110 transition-transform`} />
-              </button>
-            ))}
-          </section>
+        {/* Mobile Toolbar - Always visible compact version */}
+        <section className="flex md:hidden items-center gap-1 overflow-x-auto flex-1 justify-center mx-2">
+          {[
+            { id: "Text", icon: FaTextHeight, color: "blue" },
+            { id: "Images", icon: IoImagesSharp, color: "green" },
+            { id: "Shapes", icon: FaShapes, color: "purple" },
+            { id: "Background", icon: FaPaintBrush, color: "orange" },
+            { id: "Templates", icon: FaLayerGroup, color: "indigo" },
+          ].map(({ id, icon: Icon, color }) => (
+            <button
+              key={id}
+              onClick={() => handleNavClick(id)}
+              className={`p-2 hover:bg-${color}-50 rounded-lg transition-all duration-200 border border-transparent hover:border-${color}-200 hover:shadow-sm group flex-shrink-0`}
+              title={id}
+            >
+              <Icon className={`text-lg text-${color}-600 group-hover:scale-110 transition-transform`} />
+            </button>
+          ))}
         </section>
 
         {/* Settings Icon */}
         <button
-          className="p-3 hover:bg-gray-100 rounded-xl transition-all duration-200 border border-transparent hover:border-gray-200 hover:shadow-sm"
+          className="p-2 md:p-3 hover:bg-gray-100 rounded-lg md:rounded-xl transition-all duration-200 border border-transparent hover:border-gray-200 hover:shadow-sm flex-shrink-0"
           onClick={() => setSideBarOpen(!isSideBarOpen)}
           title="Settings"
         >
-          <IoSettings className="text-xl text-gray-600 hover:text-gray-800" />
+          <IoSettings className="text-lg md:text-xl text-gray-600 hover:text-gray-800" />
         </button>
       </section>
 
@@ -792,15 +763,25 @@ function App() {
         {/* Mobile Sidebar Overlay */}
         {mobileMenuOpen && (
           <div 
-            className="fixed inset-0 bg-black/20 z-30 md:hidden"
+            className="fixed inset-0 bg-black/20 z-40 md:hidden"
             onClick={() => setMobileMenuOpen(false)}
           />
         )}
 
         {/* Sidebar */}
-        <div className={`bg-white h-full w-64 z-40 transition-all duration-300 md:relative md:translate-x-0 fixed top-0 left-0 shadow-xl ${
+        <div className={`bg-white h-full w-64 z-50 transition-all duration-300 md:relative md:translate-x-0 fixed top-0 left-0 shadow-xl ${
           mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
         } md:shadow-none`}>
+          <div className="flex justify-between items-center p-4 border-b border-gray-200 md:hidden">
+            <h2 className="text-lg font-bold text-gray-800">Design Tools</h2>
+            <button
+              onClick={() => setMobileMenuOpen(false)}
+              className="p-2 hover:bg-gray-100 rounded-lg"
+            >
+              <X size={20} />
+            </button>
+          </div>
+          
           <section className="h-full overflow-y-auto p-4">
             <ToolModal
               isOpen={isModalOpen}
@@ -834,10 +815,14 @@ function App() {
                   canvas={canvas}
                 />
               )}
+              {tool === "Elements" && (
+                <ElementTool action={(url) => addElement(canvas, url)} />
+              )}
+
             </ToolModal>
 
             <section className="mt-2">
-              <h1 className="text-lg font-bold px-2 text-gray-700 mb-4">
+              <h1 className="text-lg font-bold px-2 text-gray-700 mb-4 hidden md:block">
                 Design Tools
               </h1>
               <section className="space-y-2">
@@ -858,7 +843,7 @@ function App() {
               </section>
               <hr className="border-gray-200 my-4" />
               <section>
-                <h1 className="text-lg font-bold px-2 text-gray-700 mb-4">
+                <h1 className="text-lg font-bold px-2 text-gray-700 mb-4 hidden md:block">
                   Elements
                 </h1>
                 <section className="space-y-2">
@@ -866,6 +851,7 @@ function App() {
                     { text: "School Name", icon: <FaIcons className="text-teal-600" /> },
                     { text: "School Logo", icon: <FaListUl className="text-red-600" /> },
                     { text: "Upload", icon: <FaUpload className="text-gray-600" /> },
+                    { text: "Elements", icon: <FaShapes className="text-purple-600" /> },
                   ].map((item) => (
                     <ToolButton
                       key={item.text}
@@ -881,45 +867,50 @@ function App() {
         </div>
 
         {/* Canvas Area */}
-        <div className="flex-1 flex items-center justify-center p-4 md:p-6 overflow-auto bg-gradient-to-br from-slate-100 to-blue-100/50 relative">
+        <div className="flex-1 flex items-center justify-center p-2 md:p-4 lg:p-6 overflow-auto bg-gradient-to-br from-slate-100 to-blue-100/50 relative">
           {/* Clean Canvas Container */}
-          <div className="bg-white rounded-xl shadow-lg border border-gray-200/50">
+          <div className="bg-white rounded-xl shadow-lg border border-gray-200/50 max-w-full">
             <canvas 
               ref={canvasRef}
-              className="block rounded-lg"
+              className="block rounded-lg max-w-full"
             />
           </div>
 
-          {/* Floating Object Controls - Fixed positioning to stay on top */}
+          {/* Floating Object Controls */}
           {showDelete && (
-            <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 flex items-center gap-3 bg-white/95 backdrop-blur-sm px-5 py-3 rounded-2xl shadow-2xl border border-gray-200/50 z-40">
+            <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 flex items-center gap-3 bg-white/95 backdrop-blur-sm px-4 py-3 rounded-2xl shadow-2xl border border-gray-200/50 z-40">
               <button
-                className="p-3 text-red-500 cursor-pointer hover:bg-red-50 rounded-xl transition-all duration-200 hover:scale-110"
+                className="p-2 text-red-500 cursor-pointer hover:bg-red-50 rounded-xl transition-all duration-200 hover:scale-110"
                 onClick={handleDeleteObject}
                 title="Delete selected object"
               >
-                <IoIosCloseCircle size={24} />
+                <IoIosCloseCircle size={20} />
               </button>
-              <div className="h-8 w-px bg-gray-300"></div>
+              <div className="h-6 w-px bg-gray-300"></div>
               <button
                 onClick={handleSendBackward}
-                className="p-3 text-gray-600 hover:bg-blue-50 hover:text-blue-600 rounded-xl transition-all duration-200 hover:scale-110"
+                className="p-2 text-gray-600 hover:bg-blue-50 hover:text-blue-600 rounded-xl transition-all duration-200 hover:scale-110"
                 title="Send backward"
               >
-                <RiSendToBack size={20} />
+                <RiSendToBack size={18} />
               </button>
               <button
                 onClick={handleBringForward}
-                className="p-3 text-gray-600 hover:bg-blue-50 hover:text-blue-600 rounded-xl transition-all duration-200 hover:scale-110"
+                className="p-2 text-gray-600 hover:bg-blue-50 hover:text-blue-600 rounded-xl transition-all duration-200 hover:scale-110"
                 title="Bring forward"
               >
-                <RiBringToFront size={20} />
+                <RiBringToFront size={18} />
               </button>
             </div>
           )}
         </div>
 
-        <Settings canvas={canvas} isSideBarOpen={isSideBarOpen} />
+        {/* Settings Sidebar */}
+        <Settings 
+          canvas={canvas} 
+          isSideBarOpen={isSideBarOpen} 
+          onClose={() => setSideBarOpen(false)}
+        />
       </main>
     </div>
   );
