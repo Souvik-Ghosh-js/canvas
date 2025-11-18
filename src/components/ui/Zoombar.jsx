@@ -9,14 +9,15 @@ export default function ZoomBar({ zoom, setZoom }) {
   };
 
   return (
-    <div className="flex items-center gap-4 w-full max-w-[420px] my-4 p-3 bg-gray-100 rounded-xl shadow-sm">
+    <div className="flex items-center gap-1.5 w-full max-w-[500px] p-1.5 bg-white border border-gray-300 rounded-md">
 
       {/* Zoom Out */}
       <button
         onClick={() => updateZoom(zoom - STEP)}
-        className="px-3 py-1 bg-white border rounded-lg shadow-sm hover:bg-gray-200"
+        className="w-6 h-6 flex items-center justify-center bg-gray-100 border border-gray-300 rounded text-sm hover:bg-gray-200 transition-colors"
+        title="Zoom Out"
       >
-        -
+        −
       </button>
 
       {/* Slider */}
@@ -27,13 +28,17 @@ export default function ZoomBar({ zoom, setZoom }) {
         step={STEP}
         value={zoom}
         onChange={(e) => updateZoom(parseFloat(e.target.value))}
-        className="w-full accent-blue-500"
+        className="flex-1 accent-blue-500 h-1"
       />
+
+      {/* Percentage */}
+      <span className="text-xs font-medium w-8 text-center">{Math.round(zoom * 100)}%</span>
 
       {/* Zoom In */}
       <button
         onClick={() => updateZoom(zoom + STEP)}
-        className="px-3 py-1 bg-white border rounded-lg shadow-sm hover:bg-gray-200"
+        className="w-6 h-6 flex items-center justify-center bg-gray-100 border border-gray-300 rounded text-sm hover:bg-gray-200 transition-colors"
+        title="Zoom In"
       >
         +
       </button>
@@ -41,13 +46,11 @@ export default function ZoomBar({ zoom, setZoom }) {
       {/* Reset */}
       <button
         onClick={() => updateZoom(1)}
-        className="px-3 py-1 bg-blue-500 text-white rounded-lg shadow hover:bg-blue-600"
+        className="w-6 h-6 flex items-center justify-center bg-blue-500 text-white text-xs rounded hover:bg-blue-600 transition-colors"
+        title="Reset Zoom"
       >
-        Reset
+        1:1
       </button>
-
-      {/* Percentage */}
-      <span className="text-sm font-semibold w-12 text-right">{Math.round(zoom * 100)}%</span>
     </div>
   );
 }

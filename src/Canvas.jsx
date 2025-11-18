@@ -54,7 +54,7 @@ import {
 
 import { Circle, Rect, Textbox } from "fabric";
 import useHistory from "./hooks/useUndoRedo";
-import { Redo, Undo } from "lucide-react";
+import { Redo, Undo, Plus, Copy, Trash2 } from "lucide-react";
 import { exportMultipleJsonToPDF } from "./utils/exportMultiPagePDF";
 import { sendEmail } from "./utils/emailService";
 
@@ -73,6 +73,7 @@ function App() {
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [currentProject, setCurrentProject] = useState(null);
   const [zoom, setZoom] = useState(1);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // New states for export modals
   const [isProjectExportModalOpen, setIsProjectExportModalOpen] = useState(false);
@@ -83,6 +84,7 @@ function App() {
   const handleNavClick = (item) => {
     setIsModalOpen(true);
     setTool(item);
+    setMobileMenuOpen(false);
   };
 
   useEffect(() => {
@@ -195,30 +197,31 @@ function App() {
   };
 
   // Updated template handler function
-const handleTemplateSelect = async (template) => {
-  try {
-    console.log('Applying template:', template.name);
-    
-    // Apply the template
-    await applyTemplateToCanvas(canvas, template);
+  const handleTemplateSelect = async (template) => {
+    try {
+      console.log('Applying template:', template.name);
 
-    // Force multiple re-renders and state updates
-    canvas.renderAll();
-    canvas.requestRenderAll();
+      // Apply the template
+      await applyTemplateToCanvas(canvas, template);
 
-    // Force a state update to trigger React re-render
-    setCanvasList(prev => [...prev]);
+      // Force multiple re-renders and state updates
+      canvas.renderAll();
+      canvas.requestRenderAll();
 
-    // Close the modal after a small delay to ensure rendering is complete
-    setTimeout(() => {
-      setIsModalOpen(false);
-    }, 100);
+      // Force a state update to trigger React re-render
+      setCanvasList(prev => [...prev]);
 
-  } catch (error) {
-    console.error('Failed to apply template:', error);
-    alert('Failed to load template. Please try again.');
-  }
-};
+      // Close the modal after a small delay to ensure rendering is complete
+      setTimeout(() => {
+        setIsModalOpen(false);
+      }, 100);
+
+    } catch (error) {
+      console.error('Failed to apply template:', error);
+      alert('Failed to load template. Please try again.');
+    }
+  };
+
   // Open export modals
   const handleOpenProjectExport = () => {
     setExportProjectName(currentProject?.project_name || "My Design");
@@ -329,14 +332,11 @@ const handleTemplateSelect = async (template) => {
   };
 
   const addSchoolLogo = (imageUrl) => {
-  if (!canvas) return;
-  
-  // Use the existing addImage function to add the school logo
-  addImage(canvas, imageUrl);
-};
+    if (!canvas) return;
+    addImage(canvas, imageUrl);
+  };
 
   // Function to switch between pages
-  // In your App component, update the switchPage function
   const switchPage = (pageId) => {
     if (!canvas || activePage === pageId) return;
 
@@ -368,6 +368,31 @@ const handleTemplateSelect = async (template) => {
     }
   };
 
+  // Enhanced layer control functions
+  const handleBringForward = () => {
+    if (!canvas) return;
+    const activeObject = canvas.getActiveObject();
+    if (activeObject) {
+      bringForward(canvas);
+      canvas.requestRenderAll();
+    }
+  };
+
+  const handleSendBackward = () => {
+    if (!canvas) return;
+    const activeObject = canvas.getActiveObject();
+    if (activeObject) {
+      sendBackward(canvas);
+      canvas.requestRenderAll();
+    }
+  };
+
+  const handleDeleteObject = () => {
+    if (!canvas) return;
+    handleDelete(canvas);
+    setShowDelete(false);
+  };
+
   // --- Canvas event listeners
   useEffect(() => {
     if (!canvas) {
@@ -382,17 +407,23 @@ const handleTemplateSelect = async (template) => {
         )
       );
     };
+    
     const handleChange = () => {
       saveCurrentPage();
     };
-    canvas.on("selection:created", () => setShowDelete(true));
-    canvas.on("selection:updated", () => setShowDelete(true));
+    
+    const handleSelection = () => {
+      const activeObject = canvas.getActiveObject();
+      setShowDelete(!!activeObject);
+    };
+
+    canvas.on("selection:created", handleSelection);
+    canvas.on("selection:updated", handleSelection);
     canvas.on("selection:cleared", () => setShowDelete(false));
 
     canvas.on("object:added", handleChange);
     canvas.on("object:modified", handleChange);
     canvas.on("object:removed", handleChange);
-    canvas.on("selection:cleared", handleChange);
 
     document.addEventListener("keydown", (e) => deleteActiveObject(e, canvas));
 
@@ -400,17 +431,20 @@ const handleTemplateSelect = async (template) => {
       document.removeEventListener("keydown", (e) =>
         deleteActiveObject(e, canvas)
       );
+      canvas.off("selection:created", handleSelection);
+      canvas.off("selection:updated", handleSelection);
+      canvas.off("selection:cleared", handleSelection);
       canvas.off("object:added", handleChange);
       canvas.off("object:modified", handleChange);
       canvas.off("object:removed", handleChange);
-      canvas.off("selection:cleared", handleChange);
     };
   }, [canvas, activePage, canvasList]);
 
   const { undo, redo, canUndo, canRedo } = useHistory(canvas);
 
   return (
-    <div className="bg-gray-300 flex h-screen w-full flex-col overflow-hidden">
+    <div className="bg-gradient-to-br from-slate-50 to-blue-50 flex h-screen w-full flex-col overflow-hidden">
+      {/* Modern Header */}
       <Header
         onExport={() => exportAsPNG(canvas)}
         onSave={handleSaveClick}
@@ -432,10 +466,10 @@ const handleTemplateSelect = async (template) => {
       {/* Project Export Modal */}
       {isProjectExportModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-96">
-            <h3 className="text-lg font-semibold mb-4">Export Project as JSON</h3>
+          <div className="bg-white rounded-xl p-6 w-96 shadow-2xl">
+            <h3 className="text-lg font-bold mb-4 text-gray-800">Export Project as JSON</h3>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Project Name
               </label>
               <input
@@ -443,7 +477,7 @@ const handleTemplateSelect = async (template) => {
                 value={exportProjectName}
                 onChange={(e) => setExportProjectName(e.target.value)}
                 placeholder="Enter project name"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 autoFocus
               />
             </div>
@@ -453,14 +487,14 @@ const handleTemplateSelect = async (template) => {
                   setIsProjectExportModalOpen(false);
                   setExportProjectName('');
                 }}
-                className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                className="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={() => exportProjectAsJson(exportProjectName)}
                 disabled={!exportProjectName.trim()}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed font-medium shadow-md transition-all"
               >
                 Export Project
               </button>
@@ -472,10 +506,10 @@ const handleTemplateSelect = async (template) => {
       {/* Page Export Modal */}
       {isPageExportModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-96">
-            <h3 className="text-lg font-semibold mb-4">Export Page as JSON</h3>
+          <div className="bg-white rounded-xl p-6 w-96 shadow-2xl">
+            <h3 className="text-lg font-bold mb-4 text-gray-800">Export Page as JSON</h3>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Page Name
               </label>
               <input
@@ -483,7 +517,7 @@ const handleTemplateSelect = async (template) => {
                 value={exportPageName}
                 onChange={(e) => setExportPageName(e.target.value)}
                 placeholder="Enter page name"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 autoFocus
               />
               <p className="text-xs text-gray-500 mt-1">
@@ -496,14 +530,14 @@ const handleTemplateSelect = async (template) => {
                   setIsPageExportModalOpen(false);
                   setExportPageName('');
                 }}
-                className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                className="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={() => exportCurrentCanvasAsJson(exportPageName)}
                 disabled={!exportPageName.trim()}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed font-medium shadow-md transition-all"
               >
                 Export Page
               </button>
@@ -528,94 +562,114 @@ const handleTemplateSelect = async (template) => {
       />
 
       {/* Page Management Section */}
-      <section className="flex gap-3 items-center px-5 py-2 bg-gray-100 border-b">
-        <button
-          className="bg-green-600 text-white px-3 py-1 rounded"
-          onClick={() => {
-            console.log('Creating new page...');
-            createNewPage({
-              canvas,
-              canvasList,
-              setCanvasList,
-              setActivePage,
-              activePage, // Add this line
-            });
-          }}
-        >
-          ➕ New Page
-        </button>
+      <section className="bg-white/80 backdrop-blur-sm border-b border-gray-200/50 px-3 py-2">
+        <div className="flex flex-wrap gap-2 items-center justify-between">
+          {/* Action Buttons */}
+          <div className="flex gap-2 items-center">
+            <button
+              className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white px-3 py-2 rounded-lg font-semibold transition-all duration-200 flex items-center gap-2 shadow-md hover:shadow-lg"
+              onClick={() => {
+                createNewPage({
+                  canvas,
+                  canvasList,
+                  setCanvasList,
+                  setActivePage,
+                  activePage,
+                });
+              }}
+              title="Create New Page"
+            >
+              <Plus size={16} />
+              <span className="hidden xs:inline">New Page</span>
+            </button>
 
-        <button
-          className="bg-blue-600 text-white px-3 py-1 rounded"
-          onClick={() => {
-            console.log('Duplicating page...');
-            duplicateCurrentPage({
-              canvas,
-              canvasList,
-              setCanvasList,
-              setActivePage,
-              activePage, // Add this line
-            });
-          }}
-        >
-          📄 Duplicate
-        </button>
+            <button
+              className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white px-3 py-2 rounded-lg font-semibold transition-all duration-200 flex items-center gap-2 shadow-md hover:shadow-lg"
+              onClick={() => {
+                duplicateCurrentPage({
+                  canvas,
+                  canvasList,
+                  setCanvasList,
+                  setActivePage,
+                  activePage,
+                });
+              }}
+              title="Duplicate Current Page"
+            >
+              <Copy size={16} />
+              <span className="hidden xs:inline">Duplicate</span>
+            </button>
 
-        <button
-          className="bg-red-500 text-white px-3 py-1 rounded"
-          onClick={() => {
-            console.log('Deleting page...');
-            deletePage({
-              canvas,
-              canvasList,
-              activePage,
-              setCanvasList,
-              setActivePage,
-            });
-          }}
-        >
-          ❌ Delete
-        </button>
+            <button
+              className="bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white px-3 py-2 rounded-lg font-semibold transition-all duration-200 flex items-center gap-2 shadow-md hover:shadow-lg"
+              onClick={() => {
+                deletePage({
+                  canvas,
+                  canvasList,
+                  activePage,
+                  setCanvasList,
+                  setActivePage,
+                });
+              }}
+              title="Delete Current Page"
+            >
+              <Trash2 size={16} />
+              <span className="hidden xs:inline">Delete</span>
+            </button>
+          </div>
 
-        {/* Page Selector */}
-        <select
-          value={activePage}
-          onChange={(e) => {
-            const pageId = Number(e.target.value);
-            console.log('Switching to page:', pageId);
-            switchPage(pageId);
-          }}
-          className="border px-2 py-1 rounded"
-        >
-          {canvasList.map((page, index) => (
-            <option key={page.id} value={page.id}>
-              Page {index + 1}
-            </option>
-          ))}
-        </select>
+          {/* Page Selector and Controls */}
+          <div className="flex gap-3 items-center">
+            {/* Page Selector */}
+            <select
+              value={activePage}
+              onChange={(e) => {
+                const pageId = Number(e.target.value);
+                switchPage(pageId);
+              }}
+              className="border border-gray-300 px-3 py-2 rounded-lg text-sm bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all min-w-[100px] font-medium"
+              title="Select Page"
+            >
+              {canvasList.map((page, index) => (
+                <option key={page.id} value={page.id}>
+                  Page {index + 1}
+                </option>
+              ))}
+            </select>
 
-        <button
-          className="p-1 cursor-pointer"
-          disabled={!canUndo}
-          onClick={undo}
-        >
-          <Undo />
-        </button>
-        <button
-          className="p-1 cursor-pointer"
-          disabled={!canRedo}
-          onClick={redo}
-        >
-          <Redo />
-        </button>
-        <ZoomBar zoom={zoom} setZoom={handleZoomChange} />
+            {/* Undo/Redo Buttons */}
+            <div className="flex gap-1 border-l border-gray-300 pl-3">
+              <button
+                className="p-2 cursor-pointer hover:bg-gray-100 rounded-lg transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent border border-gray-200"
+                disabled={!canUndo}
+                onClick={undo}
+                title="Undo"
+              >
+                <Undo size={18} />
+              </button>
+              <button
+                className="p-2 cursor-pointer hover:bg-gray-100 rounded-lg transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent border border-gray-200"
+                disabled={!canRedo}
+                onClick={redo}
+                title="Redo"
+              >
+                <Redo size={18} />
+              </button>
+            </div>
+
+            {/* Zoom Bar */}
+            <div className="min-w-[120px]">
+              <ZoomBar zoom={zoom} setZoom={handleZoomChange} />
+            </div>
+          </div>
+        </div>
       </section>
 
       {/* Page Scrollbar - Only show when more than 1 page */}
       {canvasList.length > 1 && (
-        <section className="bg-gray-100 border-b px-4 py-2">
-          <div className="flex items-center gap-2 overflow-x-auto">
-            <span className="text-sm font-medium text-gray-700 whitespace-nowrap">
+        <section className="bg-white/80 backdrop-blur-sm border-b border-gray-200/50 px-3 py-2">
+          <div className="flex items-center gap-3 overflow-x-auto">
+            <span className="text-sm font-semibold text-gray-700 whitespace-nowrap">
               Pages:
             </span>
             <div className="flex gap-2 pb-1">
@@ -623,10 +677,11 @@ const handleTemplateSelect = async (template) => {
                 <button
                   key={page.id}
                   onClick={() => switchPage(page.id)}
-                  className={`px-3 py-1 rounded-md text-sm font-medium whitespace-nowrap transition-colors min-w-[80px] ${activePage === page.id
-                      ? "bg-blue-600 text-white shadow-md"
-                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                    }`}
+                  className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-all duration-200 min-w-[90px] shadow-sm ${
+                    activePage === page.id
+                      ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-md"
+                      : "bg-white text-gray-700 hover:bg-gray-50 border border-gray-200 hover:border-gray-300"
+                  }`}
                 >
                   Page {index + 1}
                 </button>
@@ -636,57 +691,117 @@ const handleTemplateSelect = async (template) => {
         </section>
       )}
 
- <section className="w-full bg-gray-100 text-2xl flex justify-between px-7 py-3">
-  {/* Delete and Layer Controls - Visible on all screens */}
-  {showDelete && (
-    <section className="absolute bottom-3 left-55  flex items-center gap-2 bg-white px-4 py-2 rounded-xl shadow-lg">
-      <button
-        className="text-3xl text-red-500 cursor-pointer hover:text-red-700 transition-colors"
-        onClick={() => handleDelete(canvas)}
-        title="Delete selected object"
-      >
-        <IoIosCloseCircle />
-      </button>
-      <button 
-        onClick={() => sendBackward(canvas)} 
-        className="text-3xl hover:text-blue-600 transition-colors"
-        title="Send backward"
-      >
-        <RiSendToBack />
-      </button>
-      <button 
-        onClick={() => bringForward(canvas)} 
-        className="text-3xl hover:text-blue-600 transition-colors"
-        title="Bring forward"
-      >
-        <RiBringToFront />
-      </button>
-    </section>
-  )}
+      {/* Main Toolbar */}
+      <section className="w-full bg-white/90 backdrop-blur-sm border-b border-gray-200/50 flex flex-col sm:flex-row justify-between items-center px-4 py-3">
+        {/* Mobile Menu Button */}
+        <button
+          className="md:hidden p-2 hover:bg-gray-100 rounded-lg transition-colors mb-2 sm:mb-0"
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          title="Tools Menu"
+        >
+          <div className="flex flex-col gap-1">
+            <div className="w-6 h-0.5 bg-gray-600"></div>
+            <div className="w-6 h-0.5 bg-gray-600"></div>
+            <div className="w-6 h-0.5 bg-gray-600"></div>
+          </div>
+        </button>
 
-  {/* Tool Icons - Hidden on mobile, shown on desktop */}
-  <section className="flex gap-5 md:flex hidden">
-    <FaTextHeight onClick={() => handleNavClick("Text")} className="cursor-pointer hover:text-blue-600" />
-    <IoImagesSharp onClick={() => handleNavClick("Images")} className="cursor-pointer hover:text-blue-600" />
-    <FaShapes onClick={() => handleNavClick("Shapes")} className="cursor-pointer hover:text-blue-600" />
-    <FaPaintBrush onClick={() => handleNavClick("Background")} className="cursor-pointer hover:text-blue-600" />
-    <FaIcons onClick={() => handleNavClick("School Logo")} className="cursor-pointer hover:text-blue-600" />
-    <FaBuilding onClick={() => handleNavClick("School Name")} className="cursor-pointer hover:text-blue-600" />
-    <FaUpload onClick={() => handleNavClick("Upload")} className="cursor-pointer hover:text-blue-600" />
-    <FaLayerGroup onClick={() => handleNavClick("Templates")} className="cursor-pointer hover:text-blue-600" />
-  </section>
+        {/* Tool Icons */}
+        <section className="flex items-center gap-1 sm:gap-2 md:gap-3 flex-1 justify-center md:justify-start">
+          {/* Mobile Toolbar */}
+          <div className={`flex gap-2 overflow-x-auto py-1 md:hidden scrollbar-hide transition-all duration-300 ${
+            mobileMenuOpen ? 'max-w-full opacity-100' : 'max-w-0 opacity-0 overflow-hidden'
+          }`}>
+            <button
+              onClick={() => handleNavClick("Text")}
+              className="p-3 hover:bg-blue-50 rounded-xl transition-all duration-200 border border-transparent hover:border-blue-200 hover:shadow-sm flex flex-col items-center gap-1 min-w-[60px]"
+              title="Text"
+            >
+              <FaTextHeight className="text-xl text-blue-600" />
+              <span className="text-xs text-gray-600">Text</span>
+            </button>
+            <button
+              onClick={() => handleNavClick("Images")}
+              className="p-3 hover:bg-green-50 rounded-xl transition-all duration-200 border border-transparent hover:border-green-200 hover:shadow-sm flex flex-col items-center gap-1 min-w-[60px]"
+              title="Images"
+            >
+              <IoImagesSharp className="text-xl text-green-600" />
+              <span className="text-xs text-gray-600">Images</span>
+            </button>
+            <button
+              onClick={() => handleNavClick("Shapes")}
+              className="p-3 hover:bg-purple-50 rounded-xl transition-all duration-200 border border-transparent hover:border-purple-200 hover:shadow-sm flex flex-col items-center gap-1 min-w-[60px]"
+              title="Shapes"
+            >
+              <FaShapes className="text-xl text-purple-600" />
+              <span className="text-xs text-gray-600">Shapes</span>
+            </button>
+            <button
+              onClick={() => handleNavClick("Background")}
+              className="p-3 hover:bg-orange-50 rounded-xl transition-all duration-200 border border-transparent hover:border-orange-200 hover:shadow-sm flex flex-col items-center gap-1 min-w-[60px]"
+              title="Background"
+            >
+              <FaPaintBrush className="text-xl text-orange-600" />
+              <span className="text-xs text-gray-600">BG</span>
+            </button>
+            <button
+              onClick={() => handleNavClick("Templates")}
+              className="p-3 hover:bg-indigo-50 rounded-xl transition-all duration-200 border border-transparent hover:border-indigo-200 hover:shadow-sm flex flex-col items-center gap-1 min-w-[60px]"
+              title="Templates"
+            >
+              <FaLayerGroup className="text-xl text-indigo-600" />
+              <span className="text-xs text-gray-600">Templates</span>
+            </button>
+          </div>
 
-  {/* Settings Icon */}
-  <IoSettings
-    className="cursor-pointer hover:text-blue-600 transition-colors"
-    onClick={() => setSideBarOpen(!isSideBarOpen)}
-  />
-</section>
+          {/* Desktop Toolbar */}
+          <section className="hidden md:flex gap-2 lg:gap-3">
+            {[
+              { id: "Text", icon: FaTextHeight, color: "blue" },
+              { id: "Images", icon: IoImagesSharp, color: "green" },
+              { id: "Shapes", icon: FaShapes, color: "purple" },
+              { id: "Background", icon: FaPaintBrush, color: "orange" },
+              { id: "School Logo", icon: FaIcons, color: "red" },
+              { id: "School Name", icon: FaBuilding, color: "teal" },
+              { id: "Upload", icon: FaUpload, color: "gray" },
+              { id: "Templates", icon: FaLayerGroup, color: "indigo" },
+            ].map(({ id, icon: Icon, color }) => (
+              <button
+                key={id}
+                onClick={() => handleNavClick(id)}
+                className={`p-3 hover:bg-${color}-50 rounded-xl transition-all duration-200 border border-transparent hover:border-${color}-200 hover:shadow-sm group`}
+                title={id}
+              >
+                <Icon className={`text-xl text-${color}-600 group-hover:scale-110 transition-transform`} />
+              </button>
+            ))}
+          </section>
+        </section>
 
-      <main className="flex flex-1 overflow-hidden">
+        {/* Settings Icon */}
+        <button
+          className="p-3 hover:bg-gray-100 rounded-xl transition-all duration-200 border border-transparent hover:border-gray-200 hover:shadow-sm"
+          onClick={() => setSideBarOpen(!isSideBarOpen)}
+          title="Settings"
+        >
+          <IoSettings className="text-xl text-gray-600 hover:text-gray-800" />
+        </button>
+      </section>
+
+      <main className="flex flex-1 overflow-hidden relative">
+        {/* Mobile Sidebar Overlay */}
+        {mobileMenuOpen && (
+          <div 
+            className="fixed inset-0 bg-black/20 z-30 md:hidden"
+            onClick={() => setMobileMenuOpen(false)}
+          />
+        )}
+
         {/* Sidebar */}
-        <div className="bg-white h-full w-[230px] z-20 transition-all duration-300 md:relative md:inline md:translate-x-0 fixed -left-60 md:left-0">
-          <section className="h-full overflow-y-auto">
+        <div className={`bg-white h-full w-64 z-40 transition-all duration-300 md:relative md:translate-x-0 fixed top-0 left-0 shadow-xl ${
+          mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+        } md:shadow-none`}>
+          <section className="h-full overflow-y-auto p-4">
             <ToolModal
               isOpen={isModalOpen}
               onClose={() => setIsModalOpen(false)}
@@ -710,81 +825,98 @@ const handleTemplateSelect = async (template) => {
               {tool === "Upload" && <UploadTool canvas={canvas} />}
               {tool === "School Name" && (
                 <SchoolNameTool
-                  addSchoolLogo={(url) => addSchoolLogo(url)} // Changed to addSchoolLogo
+                  addSchoolLogo={(url) => addSchoolLogo(url)}
                 />
               )}
-              {/* Updated Template Tool */}
               {tool === "Templates" && (
                 <TemplateTool
                   onTemplateSelect={handleTemplateSelect}
-                  canvas={canvas} // Pass canvas to TemplateTool
+                  canvas={canvas}
                 />
               )}
             </ToolModal>
 
-            <section className="mt-5">
-              <h1 className="text-xl font-semibold px-3 text-gray-500">
+            <section className="mt-2">
+              <h1 className="text-lg font-bold px-2 text-gray-700 mb-4">
                 Design Tools
               </h1>
-              <section className="my-4">
-                <ToolButton
-                  text="Text"
-                  icon={<FaTextHeight />}
-                  onToolClick={handleNavClick}
-                />
-                <ToolButton
-                  text="Images"
-                  icon={<IoImagesSharp />}
-                  onToolClick={handleNavClick}
-                />
-                <ToolButton
-                  text="Shapes"
-                  icon={<FaShapes />}
-                  onToolClick={handleNavClick}
-                />
-                <ToolButton
-                  text="Background"
-                  icon={<FaPaintBrush />}
-                  onToolClick={handleNavClick}
-                />
-                <ToolButton
-                  text="Templates"
-                  icon={<FaLayerGroup />}
-                  onToolClick={handleNavClick}
-                />
+              <section className="space-y-2">
+                {[
+                  { text: "Text", icon: <FaTextHeight className="text-blue-600" /> },
+                  { text: "Images", icon: <IoImagesSharp className="text-green-600" /> },
+                  { text: "Shapes", icon: <FaShapes className="text-purple-600" /> },
+                  { text: "Background", icon: <FaPaintBrush className="text-orange-600" /> },
+                  { text: "Templates", icon: <FaLayerGroup className="text-indigo-600" /> },
+                ].map((item) => (
+                  <ToolButton
+                    key={item.text}
+                    text={item.text}
+                    icon={item.icon}
+                    onToolClick={handleNavClick}
+                  />
+                ))}
               </section>
-              <hr className="border-gray-200" />
-              <section className="my-5">
-                <h1 className="text-xl font-semibold px-3 text-gray-500">
+              <hr className="border-gray-200 my-4" />
+              <section>
+                <h1 className="text-lg font-bold px-2 text-gray-700 mb-4">
                   Elements
                 </h1>
-                <section className="mt-4">
-                  <ToolButton
-                    text="School Name"
-                    icon={<FaIcons />}
-                    onToolClick={handleNavClick}
-                  />
-                  <ToolButton
-                    text="School Logo"
-                    icon={<FaListUl />}
-                    onToolClick={handleNavClick}
-                  />
-                  <ToolButton
-                    text="Upload"
-                    icon={<FaUpload />}
-                    onToolClick={handleNavClick}
-                  />
+                <section className="space-y-2">
+                  {[
+                    { text: "School Name", icon: <FaIcons className="text-teal-600" /> },
+                    { text: "School Logo", icon: <FaListUl className="text-red-600" /> },
+                    { text: "Upload", icon: <FaUpload className="text-gray-600" /> },
+                  ].map((item) => (
+                    <ToolButton
+                      key={item.text}
+                      text={item.text}
+                      icon={item.icon}
+                      onToolClick={handleNavClick}
+                    />
+                  ))}
                 </section>
               </section>
             </section>
           </section>
         </div>
 
-        {/* Canvas */}
-        <div className="flex justify-center w-full mt-10" style={{
-          overflow: "auto",
-        }}>
-          <canvas ref={canvasRef}></canvas>
+        {/* Canvas Area */}
+        <div className="flex-1 flex items-center justify-center p-4 md:p-6 overflow-auto bg-gradient-to-br from-slate-100 to-blue-100/50 relative">
+          {/* Clean Canvas Container */}
+          <div className="bg-white rounded-xl shadow-lg border border-gray-200/50">
+            <canvas 
+              ref={canvasRef}
+              className="block rounded-lg"
+            />
+          </div>
+
+          {/* Floating Object Controls - Fixed positioning to stay on top */}
+          {showDelete && (
+            <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 flex items-center gap-3 bg-white/95 backdrop-blur-sm px-5 py-3 rounded-2xl shadow-2xl border border-gray-200/50 z-40">
+              <button
+                className="p-3 text-red-500 cursor-pointer hover:bg-red-50 rounded-xl transition-all duration-200 hover:scale-110"
+                onClick={handleDeleteObject}
+                title="Delete selected object"
+              >
+                <IoIosCloseCircle size={24} />
+              </button>
+              <div className="h-8 w-px bg-gray-300"></div>
+              <button
+                onClick={handleSendBackward}
+                className="p-3 text-gray-600 hover:bg-blue-50 hover:text-blue-600 rounded-xl transition-all duration-200 hover:scale-110"
+                title="Send backward"
+              >
+                <RiSendToBack size={20} />
+              </button>
+              <button
+                onClick={handleBringForward}
+                className="p-3 text-gray-600 hover:bg-blue-50 hover:text-blue-600 rounded-xl transition-all duration-200 hover:scale-110"
+                title="Bring forward"
+              >
+                <RiBringToFront size={20} />
+              </button>
+            </div>
+          )}
         </div>
 
         <Settings canvas={canvas} isSideBarOpen={isSideBarOpen} />

@@ -3,18 +3,18 @@ import RectProperties from "./RectProperties";
 import CircleProperties from "./CircleProperties";
 import TextProperties from "./TextProperties";
 import CanvasProperties from "./CanvasProperties";
-import { useEffect, useState, useRef } from "react"; // Add useRef
+import { useEffect, useState, useRef } from "react";
 import ImageProperties from "./ImageProperties";
 import { applyMask } from "../utils/imageMask";
 import { loadCustomFont } from "../utils/loadCustomFont";
-import { ZoomIn, ZoomOut, Hand } from "lucide-react"; // Add Hand icon for pan mode
+import { ZoomIn, ZoomOut, Hand, RotateCw, FlipHorizontal, FlipVertical, Settings as SettingsIcon } from "lucide-react";
 
 function Settings({ canvas, isSideBarOpen }) {
   const [canvasWidth, setCanvasWidth] = useState("");
   const [canvasHeight, setCanvasHeight] = useState("");
   const [canvasColor, setCanvasColor] = useState("");
   const [zoomLevel, setZoomLevel] = useState(100);
-  const [isPanning, setIsPanning] = useState(false); // Pan mode state
+  const [isPanning, setIsPanning] = useState(false);
   const panningRef = useRef(false);
   const lastPosXRef = useRef(0);
   const lastPosYRef = useRef(0);
@@ -54,12 +54,10 @@ function Settings({ canvas, isSideBarOpen }) {
       const currentZoom = canvas.getZoom() * 100;
       setZoomLevel(Math.round(currentZoom));
 
-      // Enable canvas panning
       setupCanvasPanning();
     }
 
     return () => {
-      // Cleanup event listeners
       if (canvas) {
         canvas.off('mouse:down');
         canvas.off('mouse:move');
@@ -68,14 +66,13 @@ function Settings({ canvas, isSideBarOpen }) {
     };
   }, [canvas]);
 
-  // Setup canvas panning functionality
   const setupCanvasPanning = () => {
     if (!canvas) return;
 
     canvas.on('mouse:down', (options) => {
       if (isPanning && options.e && canvas.getZoom() > 1) {
         panningRef.current = true;
-        canvas.selection = false; // Disable object selection while panning
+        canvas.selection = false;
         canvas.defaultCursor = 'grabbing';
         lastPosXRef.current = options.e.clientX;
         lastPosYRef.current = options.e.clientY;
@@ -107,13 +104,12 @@ function Settings({ canvas, isSideBarOpen }) {
     });
   };
 
-  // Toggle pan mode
   const togglePanMode = () => {
     const newPanningState = !isPanning;
     setIsPanning(newPanningState);
     
     if (canvas) {
-      canvas.selection = !newPanningState; // Disable selection when panning
+      canvas.selection = !newPanningState;
       canvas.defaultCursor = newPanningState ? 'grab' : 'default';
       
       if (!newPanningState) {
@@ -122,7 +118,6 @@ function Settings({ canvas, isSideBarOpen }) {
     }
   };
 
-  // Zoom handlers
   const handleZoomChange = (e) => {
     const newZoom = parseInt(e.target.value);
     setZoomLevel(newZoom);
@@ -145,8 +140,6 @@ function Settings({ canvas, isSideBarOpen }) {
     if (canvas) {
       const zoomFactor = zoom / 100;
       canvas.setZoom(zoomFactor);
-      
-      // Center the viewport after zooming
       centerViewport();
       canvas.renderAll();
     }
@@ -158,7 +151,6 @@ function Settings({ canvas, isSideBarOpen }) {
       const canvasHeight = canvas.getHeight();
       const zoom = canvas.getZoom();
       
-      // Reset viewport to center
       canvas.viewportTransform[4] = (canvasWidth - canvasWidth * zoom) / 2;
       canvas.viewportTransform[5] = (canvasHeight - canvasHeight * zoom) / 2;
       canvas.setViewportTransform(canvas.viewportTransform);
@@ -168,7 +160,7 @@ function Settings({ canvas, isSideBarOpen }) {
   const resetZoom = () => {
     setZoomLevel(100);
     applyZoom(100);
-    setIsPanning(false); // Exit pan mode when resetting zoom
+    setIsPanning(false);
     
     if (canvas) {
       canvas.selection = true;
@@ -176,7 +168,6 @@ function Settings({ canvas, isSideBarOpen }) {
     }
   };
 
-  // ... rest of your existing handlers remain the same
   const handleCanvasColorChange = (e) => {
     const value = e.target.value;
     setCanvasColor(value);
@@ -301,174 +292,259 @@ function Settings({ canvas, isSideBarOpen }) {
     }
   };
 
+  const rotateObject = (degrees) => {
+    const activeObject = canvas.getActiveObject();
+    if (activeObject) {
+      activeObject.rotate(activeObject.angle + degrees);
+      canvas.renderAll();
+    }
+  };
+
   return (
     <div
-      className={`bg-white w-[230px] py-2 transition-all fixed md:right-0 z-99 ${
+      className={`bg-gradient-to-b from-white to-blue-50/30 w-80 py-4 transition-all duration-300 fixed md:right-0 z-50 h-full overflow-y-auto border-l border-gray-200/50 shadow-xl ${
         isSideBarOpen ? "right-0" : "-right-full"
       }`}
     >
-      <section className="px-5">
-        <h1 className="font-semibold text-xl">Tool Properties</h1>
+      {/* Header */}
+      <section className="px-6 pb-4 border-b border-gray-200/50">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="p-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl shadow-md">
+            <SettingsIcon className="text-white" size={20} />
+          </div>
+          <div>
+            <h1 className="font-bold text-xl bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              Properties
+            </h1>
+            <p className="text-xs text-gray-500">
+              {selectedObject ? `${selectedObject.type.charAt(0).toUpperCase() + selectedObject.type.slice(1)} Settings` : "Canvas Settings"}
+            </p>
+          </div>
+        </div>
       </section>
       
-      {/* Zoom Controls */}
-      <section className="px-5 py-3 border-b border-gray-200">
-        <div className="flex items-center justify-between mb-2">
-          <label className="text-sm font-medium text-gray-700">Zoom & Pan</label>
-          <div className="flex items-center gap-1">
-            <span className="text-xs text-gray-500">{zoomLevel}%</span>
-            <button 
-              onClick={resetZoom}
-              className="text-xs text-blue-600 hover:text-blue-800 px-1"
+      {/* Zoom & Navigation Section */}
+      <section className="px-6 py-4 border-b border-gray-200/50 bg-white/50 rounded-lg mx-4 my-3">
+        <div className="flex items-center justify-between mb-4">
+          <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+            <div className="w-2 h-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full"></div>
+            View Controls
+          </label>
+          <button 
+            onClick={resetZoom}
+            className="text-xs bg-gradient-to-r from-gray-100 to-gray-200 hover:from-gray-200 hover:to-gray-300 text-gray-700 px-3 py-1 rounded-full font-medium transition-all shadow-sm"
+          >
+            Reset
+          </button>
+        </div>
+        
+        {/* Zoom Controls */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-gray-600">Zoom Level</span>
+            <span className="text-sm font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              {zoomLevel}%
+            </span>
+          </div>
+          
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleZoomOut}
+              disabled={zoomLevel <= 10}
+              className="p-2 rounded-xl bg-gradient-to-r from-gray-100 to-gray-200 hover:from-gray-200 hover:to-gray-300 disabled:from-gray-50 disabled:to-gray-100 disabled:opacity-50 transition-all shadow-sm"
+              title="Zoom Out"
             >
-              Reset
+              <ZoomOut size={18} className="text-gray-600" />
+            </button>
+            
+            <div className="flex-1">
+              <input
+                type="range"
+                min="10"
+                max="200"
+                value={zoomLevel}
+                onChange={handleZoomChange}
+                className="w-full h-2 bg-gradient-to-r from-blue-200 to-purple-200 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-gradient-to-r [&::-webkit-slider-thumb]:from-blue-500 [&::-webkit-slider-thumb]:to-purple-500 [&::-webkit-slider-thumb]:shadow-lg"
+              />
+            </div>
+            
+            <button
+              onClick={handleZoomIn}
+              disabled={zoomLevel >= 200}
+              className="p-2 rounded-xl bg-gradient-to-r from-gray-100 to-gray-200 hover:from-gray-200 hover:to-gray-300 disabled:from-gray-50 disabled:to-gray-100 disabled:opacity-50 transition-all shadow-sm"
+              title="Zoom In"
+            >
+              <ZoomIn size={18} className="text-gray-600" />
             </button>
           </div>
-        </div>
-        
-        {/* Pan Mode Toggle */}
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-sm text-gray-600">Pan Mode</span>
-          <button
-            onClick={togglePanMode}
-            className={`p-2 rounded-md transition-colors ${
-              isPanning 
-                ? 'bg-blue-100 text-blue-600 border border-blue-300' 
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-            title={isPanning ? "Disable panning" : "Enable panning (click and drag to move canvas)"}
-          >
-            <Hand size={16} />
-          </button>
+          
+          <div className="flex justify-between text-xs text-gray-500 px-1">
+            <span>10%</span>
+            <span>100%</span>
+            <span>200%</span>
+          </div>
         </div>
 
-        {isPanning && (
-          <div className="mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-700">
-            Pan mode active: Click and drag to move the canvas
-          </div>
-        )}
-        
-        <div className="flex items-center gap-2 mb-2">
-          <button
-            onClick={handleZoomOut}
-            disabled={zoomLevel <= 10}
-            className="p-1 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Zoom Out"
-          >
-            <ZoomOut size={16} />
-          </button>
-          
-          <div className="flex-1">
-            <input
-              type="range"
-              min="10"
-              max="200"
-              value={zoomLevel}
-              onChange={handleZoomChange}
-              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
-            />
+        {/* Pan Mode Toggle */}
+        <div className="mt-4 p-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl border border-blue-100">
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="text-sm font-semibold text-gray-700 block">Pan Mode</span>
+              <span className="text-xs text-gray-500">Click and drag to navigate</span>
+            </div>
+            <button
+              onClick={togglePanMode}
+              className={`p-3 rounded-xl transition-all duration-300 shadow-sm ${
+                isPanning 
+                  ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-md' 
+                  : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
+              }`}
+              title={isPanning ? "Disable panning" : "Enable panning"}
+            >
+              <Hand size={18} />
+            </button>
           </div>
           
-          <button
-            onClick={handleZoomIn}
-            disabled={zoomLevel >= 200}
-            className="p-1 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Zoom In"
-          >
-            <ZoomIn size={16} />
-          </button>
-        </div>
-        
-        <div className="flex justify-between text-xs text-gray-500">
-          <span>10%</span>
-          <span>100%</span>
-          <span>200%</span>
+          {isPanning && (
+            <div className="mt-2 p-2 bg-yellow-100 border border-yellow-200 rounded-lg text-xs text-yellow-700 flex items-center gap-2">
+              <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
+              Pan mode active - Click and drag to move canvas
+            </div>
+          )}
         </div>
       </section>
 
-      <hr className="border-gray-200 my-2" />
-      
+      {/* Transform Controls */}
+      {selectedObject && (
+        <section className="px-6 py-4 border-b border-gray-200/50 bg-white/50 rounded-lg mx-4 my-3">
+          <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+            <div className="w-2 h-2 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full"></div>
+            Transform
+          </h3>
+          <div className="grid grid-cols-3 gap-2">
+            <button
+              onClick={() => rotateObject(-15)}
+              className="p-3 bg-gradient-to-r from-gray-100 to-gray-200 hover:from-gray-200 hover:to-gray-300 rounded-xl transition-all shadow-sm flex flex-col items-center gap-1"
+              title="Rotate -15°"
+            >
+              <RotateCw size={16} className="text-gray-600" />
+              <span className="text-xs text-gray-600">-15°</span>
+            </button>
+            <button
+              onClick={horizontallyFlip}
+              className="p-3 bg-gradient-to-r from-gray-100 to-gray-200 hover:from-gray-200 hover:to-gray-300 rounded-xl transition-all shadow-sm flex flex-col items-center gap-1"
+              title="Flip Horizontal"
+            >
+              <FlipHorizontal size={16} className="text-gray-600" />
+              <span className="text-xs text-gray-600">Flip H</span>
+            </button>
+            <button
+              onClick={verticallyFlip}
+              className="p-3 bg-gradient-to-r from-gray-100 to-gray-200 hover:from-gray-200 hover:to-gray-300 rounded-xl transition-all shadow-sm flex flex-col items-center gap-1"
+              title="Flip Vertical"
+            >
+              <FlipVertical size={16} className="text-gray-600" />
+              <span className="text-xs text-gray-600">Flip V</span>
+            </button>
+          </div>
+        </section>
+      )}
+
+      {/* Properties Sections */}
+      <div className="px-4 space-y-4">
+        {!selectedObject && (
+          <CanvasProperties
+            height={canvasHeight}
+            width={canvasWidth}
+            color={canvasColor}
+            onColorChange={handleCanvasColorChange}
+          />
+        )}
+        {selectedObject?.type === "rect" && (
+          <RectProperties
+            width={width}
+            height={height}
+            color={color}
+            stroke={stroke}
+            strokeColor={strokeColor}
+            onStrokeChange={handleStrokeChange}
+            onStrokeColorChange={handleStrokeColorChange}
+            onWidthChange={handleWidthChange}
+            onHeightChange={handleHeightChange}
+            onColorChange={handleColorChange}
+            opacity={opacity}
+            onOpacityChange={handleOpacityChange}
+          />
+        )}
+        {selectedObject?.type === "triangle" && (
+          <RectProperties
+            width={width}
+            height={height}
+            color={color}
+            stroke={stroke}
+            strokeColor={strokeColor}
+            onStrokeChange={handleStrokeChange}
+            onStrokeColorChange={handleStrokeColorChange}
+            onWidthChange={handleWidthChange}
+            onHeightChange={handleHeightChange}
+            onColorChange={handleColorChange}
+            opacity={opacity}
+            onOpacityChange={handleOpacityChange}
+          />
+        )}
+        {selectedObject?.type === "circle" && (
+          <CircleProperties
+            diameter={diameter}
+            stroke={stroke}
+            strokeColor={strokeColor}
+            color={color}
+            onDiameterChange={handleDiameterChange}
+            onStrokeChange={handleStrokeChange}
+            onColorChange={handleColorChange}
+            onStrokeColorChange={handleStrokeColorChange}
+            opacity={opacity}
+            onOpacityChange={handleOpacityChange}
+          />
+        )}
+        {selectedObject?.type === "textbox" && (
+          <TextProperties
+            fontSize={fontSize}
+            onFontSizeChange={handleFontSizeChange}
+            fontWeight={fontWeight}
+            font={font}
+            textAlign={textAlign}
+            onFontWeightChange={handleFontWeightChange}
+            onColorChange={handleColorChange}
+            onFontChange={handleFontChange}
+            canvas={canvas}
+            onTextAlign={handleTextAlign}
+            color={color}
+            opacity={opacity}
+            onOpacityChange={handleOpacityChange}
+          />
+        )}
+        {selectedObject?.type === "image" && (
+          <ImageProperties
+            height={height}
+            width={width}
+            onWidthChange={handleWidthChange}
+            onHeightChange={handleHeightChange}
+            onApplyMask={(shape) => applyMask(canvas, shape)}
+            onHFlip={horizontallyFlip}
+            onVFlip={verticallyFlip}
+          />
+        )}
+      </div>
+
+      {/* Empty State */}
       {!selectedObject && (
-        <CanvasProperties
-          height={canvasHeight}
-          width={canvasWidth}
-          color={canvasColor}
-          onColorChange={handleCanvasColorChange}
-        />
-      )}
-      {selectedObject?.type === "rect" && (
-        <RectProperties
-          width={width}
-          height={height}
-          color={color}
-          stroke={stroke}
-          strokeColor={strokeColor}
-          onStrokeChange={handleStrokeChange}
-          onStrokeColorChange={handleStrokeColorChange}
-          onWidthChange={handleWidthChange}
-          onHeightChange={handleHeightChange}
-          onColorChange={handleColorChange}
-          opacity={opacity}
-          onOpacityChange={handleOpacityChange}
-        />
-      )}
-      {selectedObject?.type === "triangle" && (
-        <RectProperties
-          width={width}
-          height={height}
-          color={color}
-          stroke={stroke}
-          strokeColor={strokeColor}
-          onStrokeChange={handleStrokeChange}
-          onStrokeColorChange={handleStrokeColorChange}
-          onWidthChange={handleWidthChange}
-          onHeightChange={handleHeightChange}
-          onColorChange={handleColorChange}
-          opacity={opacity}
-          onOpacityChange={handleOpacityChange}
-        />
-      )}
-      {selectedObject?.type === "circle" && (
-        <CircleProperties
-          diameter={diameter}
-          stroke={stroke}
-          strokeColor={strokeColor}
-          color={color}
-          onDiameterChange={handleDiameterChange}
-          onStrokeChange={handleStrokeChange}
-          onColorChange={handleColorChange}
-          onStrokeColorChange={handleStrokeColorChange}
-          opacity={opacity}
-          onOpacityChange={handleOpacityChange}
-        />
-      )}
-      {selectedObject?.type === "textbox" && (
-        <TextProperties
-          fontSize={fontSize}
-          onFontSizeChange={handleFontSizeChange}
-          fontWeight={fontWeight}
-          font={font}
-          textAlign={textAlign}
-          onFontWeightChange={handleFontWeightChange}
-          onColorChange={handleColorChange}
-          onFontChange={handleFontChange}
-          canvas={canvas}
-          onTextAlign={handleTextAlign}
-          color={color}
-          opacity={opacity}
-          onOpacityChange={handleOpacityChange}
-        />
-      )}
-      {selectedObject?.type === "image" && (
-        <ImageProperties
-          height={height}
-          width={width}
-          onWidthChange={handleWidthChange}
-          onHeightChange={handleHeightChange}
-          onApplyMask={(shape) => applyMask(canvas, shape)}
-          onHFlip={horizontallyFlip}
-          onVFlip={verticallyFlip}
-        />
+        <div className="px-6 py-8 text-center">
+          <div className="w-16 h-16 bg-gradient-to-r from-blue-100 to-purple-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <SettingsIcon className="text-gray-400" size={24} />
+          </div>
+          <h3 className="text-sm font-semibold text-gray-600 mb-2">No Object Selected</h3>
+          <p className="text-xs text-gray-500">Select an object on the canvas to edit its properties</p>
+        </div>
       )}
     </div>
   );
