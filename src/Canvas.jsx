@@ -321,6 +321,39 @@ function App() {
     );
   };
 
+  // Function to switch between pages
+// In your App component, update the switchPage function
+const switchPage = (pageId) => {
+  if (!canvas || activePage === pageId) return;
+
+  try {
+    // Save current page state
+    const updatedCanvasList = canvasList.map((page) =>
+      page.id === activePage ? { ...page, json: canvas.toJSON() } : page
+    );
+    
+    setCanvasList(updatedCanvasList);
+    setActivePage(pageId);
+    
+    // Load the selected page
+    const selectedPage = updatedCanvasList.find((p) => p.id === pageId);
+    
+    if (selectedPage?.json) {
+      canvas.loadFromJSON(selectedPage.json).then(() => {
+        canvas.requestRenderAll();
+      });
+    } else {
+      // Set default background for empty page
+      canvas.clear();
+      canvas.setBackgroundColor('#ffffff', () => {
+        canvas.requestRenderAll();
+      });
+    }
+  } catch (error) {
+    console.error('Error switching page:', error);
+  }
+};
+
   // --- Canvas event listeners
   useEffect(() => {
     if (!canvas) {
@@ -480,89 +513,116 @@ function App() {
         fileName="my_design"
       />
 
-      <section className="flex gap-3 items-center px-5 py-2 bg-gray-100 border-b">
-        <button
-          className="bg-green-600 text-white px-3 py-1 rounded"
-          onClick={() =>
-            createNewPage({
-              canvas,
-              canvasList,
-              setCanvasList,
-              setActivePage,
-            })
-          }
-        >
-          ➕
-        </button>
+      {/* Page Management Section */}
+<section className="flex gap-3 items-center px-5 py-2 bg-gray-100 border-b">
+  <button
+    className="bg-green-600 text-white px-3 py-1 rounded"
+    onClick={() => {
+      console.log('Creating new page...');
+      createNewPage({
+        canvas,
+        canvasList,
+        setCanvasList,
+        setActivePage,
+        activePage, // Add this line
+      });
+    }}
+  >
+    ➕ New Page
+  </button>
 
-        <button
-          className="bg-blue-600 text-white px-3 py-1 rounded"
-          onClick={() =>
-            duplicateCurrentPage({
-              canvas,
-              canvasList,
-              setCanvasList,
-              setActivePage,
-            })
-          }
-        >
-          📄
-        </button>
-        <button
-          className="bg-red-500 text-white px-3 py-1 rounded"
-          onClick={() =>
-            deletePage({
-              canvas,
-              canvasList,
-              activePage,
-              setCanvasList,
-              setActivePage,
-            })
-          }
-        >
-          X
-        </button>
-        <select
-          value={activePage}
-          onChange={(e) => {
-            const id = Number(e.target.value);
-            setActivePage(id);
-            const selected = canvasList.find((p) => p.id === id);
-            loadPageToCanvas({
-              canvas,
-              json: selected?.json || null,
-              pageDefaults: {
-                width: 300,
-                height: 425,
-                backgroundColor: "#ffffff",
-              },
-            });
-          }}
-          className="border px-2 py-1 rounded"
-        >
-          {canvasList.map((p, idx) => (
-            <option key={p.id} value={p.id}>
-              Page {idx + 1}
-            </option>
-          ))}
-        </select>
-        <button
-          className=" p-1 cursor-pointer"
-          disabled={!canUndo}
-          onClick={undo}
-        >
-          <Undo />
-        </button>
-        <button
-          className="p-1 cursor-pointer"
-          disabled={!canRedo}
-          onClick={redo}
-        >
-          <Redo />
-        </button>
-         <ZoomBar zoom={zoom} setZoom={handleZoomChange} />
+  <button
+    className="bg-blue-600 text-white px-3 py-1 rounded"
+    onClick={() => {
+      console.log('Duplicating page...');
+      duplicateCurrentPage({
+        canvas,
+        canvasList,
+        setCanvasList,
+        setActivePage,
+        activePage, // Add this line
+      });
+    }}
+  >
+    📄 Duplicate
+  </button>
 
-      </section>
+  <button
+    className="bg-red-500 text-white px-3 py-1 rounded"
+    onClick={() => {
+      console.log('Deleting page...');
+      deletePage({
+        canvas,
+        canvasList,
+        activePage,
+        setCanvasList,
+        setActivePage,
+      });
+    }}
+  >
+    ❌ Delete
+  </button>
+
+  {/* Page Selector */}
+  <select
+    value={activePage}
+    onChange={(e) => {
+      const pageId = Number(e.target.value);
+      console.log('Switching to page:', pageId);
+      switchPage(pageId);
+    }}
+    className="border px-2 py-1 rounded"
+  >
+    {canvasList.map((page, index) => (
+      <option key={page.id} value={page.id}>
+        Page {index + 1}
+      </option>
+    ))}
+  </select>
+
+  <button
+    className="p-1 cursor-pointer"
+    disabled={!canUndo}
+    onClick={undo}
+  >
+    <Undo />
+  </button>
+  <button
+    className="p-1 cursor-pointer"
+    disabled={!canRedo}
+    onClick={redo}
+  >
+    <Redo />
+  </button>
+  <ZoomBar zoom={zoom} setZoom={handleZoomChange} />
+</section>
+
+      {/* Page Scrollbar - Only show when more than 1 page */}
+      {canvasList.length > 1 && (
+        <section className="bg-gray-100 border-b px-4 py-2">
+          <div className="flex items-center gap-2 overflow-x-auto">
+            <span className="text-sm font-medium text-gray-700 whitespace-nowrap">
+              Pages:
+            </span>
+            <div className="flex gap-2 pb-1">
+              {canvasList.map((page, index) => (
+                <button
+                  key={page.id}
+                  onClick={() => switchPage(page.id)}
+                  className={`px-3 py-1 rounded-md text-sm font-medium whitespace-nowrap transition-colors min-w-[80px] ${
+                    activePage === page.id
+                      ? "bg-blue-600 text-white shadow-md"
+                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                  }`}
+                >
+                  Page {index + 1}
+                </button>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
       <section className="w-full bg-gray-100 text-2xl flex justify-between px-7 py-3 md:hidden">
         {showDelete && (
           <section className="absolute bottom-3 left-33 z-10 flex items-center gap-2 bg-white px-4 py-2 rounded-xl">

@@ -21,26 +21,42 @@ export const createNewPage = ({
   canvasList,
   setCanvasList,
   setActivePage,
+  activePage, // Add this parameter
 }) => {
+  if (!canvas) return;
+
+  // First, save the current page state
+  const updatedCanvasList = canvasList.map(page => {
+    if (page.id === activePage) {
+      return { ...page, json: canvas.toJSON() };
+    }
+    return page;
+  });
+
   const id = Date.now();
   const json = {
     version: "6.7.1",
     background: "#ffffff",
   };
 
-  setCanvasList([
-    ...canvasList,
+  const newCanvasList = [
+    ...updatedCanvasList,
     {
       id,
       json,
     },
-  ]);
+  ];
 
+  setCanvasList(newCanvasList);
   setActivePage(id);
 
+  // Clear and set up new page
+  canvas.clear();
   canvas.loadFromJSON(json).then(() => {
     canvas.requestRenderAll();
   });
+
+  return id;
 };
 
 // Duplicate existing page
@@ -49,31 +65,67 @@ export const duplicateCurrentPage = ({
   canvasList,
   setCanvasList,
   setActivePage,
+  activePage,
 }) => {
-  if (!canvas) return;
+  if (!canvas || !activePage) return;
 
-  const json = canvas.toJSON();
+  // First, save the current page state
+  const updatedCanvasList = canvasList.map(page => {
+    if (page.id === activePage) {
+      return { ...page, json: canvas.toJSON() };
+    }
+    return page;
+  });
+
+  const currentPage = canvasList.find(page => page.id === activePage);
   const id = Date.now();
 
-  setCanvasList([...canvasList, { id, json }]);
+  const newCanvasList = [
+    ...updatedCanvasList,
+    { 
+      id, 
+      json: currentPage?.json || {
+        version: "6.7.1",
+        background: "#ffffff",
+      }
+    },
+  ];
+
+  setCanvasList(newCanvasList);
   setActivePage(id);
 
-  canvas.loadFromJSON(json).then(() => {
+  // Load the duplicated content
+  canvas.loadFromJSON(currentPage?.json || {
+    version: "6.7.1",
+    background: "#ffffff",
+  }).then(() => {
     canvas.requestRenderAll();
   });
+
+  return id;
 };
 
 // Load a page JSON into the canvas
-export const loadPageToCanvas = ({ canvas, json }) => {
+export const loadPageToCanvas = ({ canvas, json, pageDefaults = {} }) => {
   if (!canvas) return;
-  if (!json) return;
 
-  canvas.loadFromJSON(json).then(() => {
+  canvas.clear();
+
+  if (json) {
+    canvas.loadFromJSON(json).then(() => {
+      canvas.requestRenderAll();
+    });
+  } else {
+    // Set up blank page with defaults
+    const { width = 300, height = 425, backgroundColor = "#ffffff" } = pageDefaults;
+    canvas.setWidth(width);
+    canvas.setHeight(height);
+    canvas.backgroundColor = backgroundColor;
     canvas.requestRenderAll();
-  });
+  }
 };
 
-// Delete active page
+// Delete active page - FIXED VERSION
 export const deletePage = ({
   canvas,
   canvasList,
@@ -83,7 +135,10 @@ export const deletePage = ({
 }) => {
   if (!canvas || !activePage) return;
 
-  const updatedList = canvasList.filter((page) => page.id !== activePage);
+  // Save current page state before deletion
+  const updatedList = canvasList.map(page => 
+    page.id === activePage ? { ...page, json: canvas.toJSON() } : page
+  ).filter((page) => page.id !== activePage);
 
   if (updatedList.length === 0) {
     // Create new blank page if all deleted
@@ -103,8 +158,8 @@ export const deletePage = ({
       canvas.requestRenderAll();
     });
   } else {
-    // Load last page
-    const nextPage = updatedList[updatedList.length - 1];
+    // Load the first page (or you can choose to load the previous page)
+    const nextPage = updatedList[0];
     setCanvasList(updatedList);
     setActivePage(nextPage.id);
 
