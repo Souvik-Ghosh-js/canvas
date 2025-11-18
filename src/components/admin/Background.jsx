@@ -1,27 +1,32 @@
 import React, { useRef, useState } from "react";
 import { supabase } from "../../supabase/config";
 import { useSupabaseStorage } from "../../hooks/useSupabaseStorage";
+
 const BackgroundUpload = () => {
   const { files, uploading, error, uploadFile, deleteFile } =
     useSupabaseStorage("background");
-  const [selectedFile, setSelectedFile] = useState(null);
+  const [selectedFiles, setSelectedFiles] = useState([]);
   const fileInputRef = useRef(null);
 
   const handleFileSelect = (event) => {
-    const file = event.target.files[0];
-    if (file) {
-      setSelectedFile(file);
+    const selectedFilesArray = Array.from(event.target.files);
+    if (selectedFilesArray.length > 0) {
+      setSelectedFiles(selectedFilesArray);
     }
   };
 
   const handleUpload = async () => {
-    if (selectedFile) {
-      // Add your upload logic here
-      uploadFile(selectedFile);
-      console.log("Uploading file:", selectedFile.name);
-      alert(`Uploading: ${selectedFile.name}`);
+    if (selectedFiles.length > 0) {
+      // Upload all selected files
+      for (const file of selectedFiles) {
+        await uploadFile(file);
+        console.log("Uploading file:", file.name);
+      }
+      
+      alert(`Uploading ${selectedFiles.length} file(s)`);
+      
       // Reset after upload
-      setSelectedFile(null);
+      setSelectedFiles([]);
       fileInputRef.current.value = "";
     }
   };
@@ -30,25 +35,46 @@ const BackgroundUpload = () => {
     fileInputRef.current?.click();
   };
 
+  const removeSelectedFile = (indexToRemove) => {
+    setSelectedFiles(prev => prev.filter((_, index) => index !== indexToRemove));
+  };
+
   return (
     <section>
       <div className="flex items-center gap-4 p-4 bg-white rounded-lg border border-gray-200">
-        {/* Hidden file input */}
+        {/* Hidden file input - now with multiple attribute */}
         <input
           type="file"
           ref={fileInputRef}
           onChange={handleFileSelect}
           className="hidden"
+          multiple
         />
 
         {/* File info */}
         <div className="flex-1 min-w-0">
-          {selectedFile ? (
-            <p className="text-sm text-gray-700 truncate">
-              📄 {selectedFile.name}
-            </p>
+          {selectedFiles.length > 0 ? (
+            <div className="space-y-1">
+              <p className="text-sm text-gray-700">
+                {selectedFiles.length} file(s) selected:
+              </p>
+              <div className="max-h-20 overflow-y-auto">
+                {selectedFiles.map((file, index) => (
+                  <div key={index} className="flex items-center justify-between text-xs text-gray-600">
+                    <span className="truncate">📄 {file.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeSelectedFile(index)}
+                      className="ml-2 text-red-500 hover:text-red-700"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
           ) : (
-            <p className="text-sm text-gray-500">No file selected</p>
+            <p className="text-sm text-gray-500">No files selected</p>
           )}
         </div>
 
@@ -58,18 +84,20 @@ const BackgroundUpload = () => {
             onClick={handleButtonClick}
             className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
           >
-            Choose File
+            Choose Files
           </button>
 
           <button
             onClick={handleUpload}
-            disabled={!selectedFile}
+            disabled={!selectedFiles.length || uploading}
             className="px-4 py-2 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
           >
-            {uploading ? "Uploading" : "Upload"}
+            {uploading ? "Uploading..." : `Upload (${selectedFiles.length})`}
           </button>
         </div>
       </div>
+
+      {/* Uploaded files grid */}
       <div className="max-w-5xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-6 mt-5">
         {files.length > 0 ? (
           files.map((f) => (
