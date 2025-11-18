@@ -6,6 +6,8 @@ const TemplateTool = ({ onTemplateSelect, canvas }) => {
   const [loading, setLoading] = useState(true);
   const [thumbnails, setThumbnails] = useState({});
   const [thumbnailLoading, setThumbnailLoading] = useState({});
+  const [selectedTemplate, setSelectedTemplate] = useState(null);
+  const scrollContainerRef = useRef(null);
 
   useEffect(() => {
     loadTemplates();
@@ -100,6 +102,7 @@ const handleTemplateClick = async (template) => {
   }
 };
 
+
   const getFallbackThumbnail = (template) => {
     if (template.type === 'application/json') {
       return `data:image/svg+xml;base64,${btoa(`
@@ -143,90 +146,132 @@ const handleTemplateClick = async (template) => {
   }
 
   return (
-    <div className="p-4">
-      <h2 className="text-lg font-semibold mb-4">Templates</h2>
-      
-      {/* Template Grid */}
-      <div className="grid grid-cols-2 gap-4">
-        {templates.map((template, index) => (
-          <div
-            key={template.name}
-            className="border border-gray-200 rounded-lg overflow-hidden cursor-pointer hover:shadow-md transition-shadow bg-white"
-            onClick={() => handleTemplateClick(template)}
-          >
-            {/* Thumbnail */}
-            <div className="aspect-video bg-gray-50 flex items-center justify-center relative">
-              {thumbnailLoading[template.name] ? (
-                <div className="text-center text-gray-400">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto mb-2"></div>
-                  <div className="text-xs">Loading...</div>
-                </div>
-              ) : (
-                <>
-                  <img
-                    src={getTemplateThumbnail(template)}
-                    alt={getTemplateDisplayName(template, index)}
-                    className="w-full h-full object-contain"
-                    onError={(e) => {
-                      // If image fails to load, use fallback
-                      e.target.src = getFallbackThumbnail(template);
-                    }}
-                  />
-                  
-                  {/* Template Type Badge */}
-                  <div className="absolute top-2 right-2">
-                    <span className={`text-xs px-2 py-1 rounded-full ${
-                      template.type === 'application/json' 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-blue-100 text-blue-800'
-                    }`}>
-                      {template.type === 'application/json' ? 'JSON' : 'IMG'}
-                    </span>
-                  </div>
-                </>
-              )}
-            </div>
-            
-            {/* Template Info */}
-            <div className="p-3 border-t">
-              <div className="flex justify-between items-start mb-1">
-                <h3 className="font-medium text-sm text-gray-900 truncate flex-1">
-                  {getTemplateDisplayName(template, index)}
-                </h3>
-              </div>
-              
-              {template.category && template.category !== 'Other' && (
-                <span className="inline-block bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded mb-2">
-                  {template.category}
-                </span>
-              )}
-              
-              <div className="flex justify-between items-center text-xs text-gray-500">
-                <span>
-                  {template.type === 'application/json' ? 'JSON Template' : 'Image Template'}
-                </span>
-                <span>
-                  {formatFileSize(template.size)}
-                </span>
-              </div>
+    <div className="flex flex-col h-full">
+      <div className="p-4 border-b">
+        <h2 className="text-lg font-semibold">Templates</h2>
+        
+        {/* Selected Template Info */}
+        {selectedTemplate && (
+          <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="text-sm text-blue-800 flex items-center">
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              <strong>Selected:</strong> 
+              <span className="ml-1">
+                {getTemplateDisplayName(templates.find(t => t.name === selectedTemplate), templates.findIndex(t => t.name === selectedTemplate))}
+              </span>
             </div>
           </div>
-        ))}
+        )}
       </div>
-      
-      {/* Empty State */}
-      {templates.length === 0 && (
-        <div className="text-center text-gray-500 py-8 border-2 border-dashed border-gray-300 rounded-lg">
-          <div className="text-lg mb-2">No templates available</div>
-          <div className="text-sm">Upload templates to get started</div>
+
+      {/* Scrollable Template Container */}
+      <div 
+        ref={scrollContainerRef}
+        className="flex-1 overflow-y-auto p-4"
+        style={{ 
+          maxHeight: 'calc(100vh - 200px)',
+          WebkitOverflowScrolling: 'touch' // Smooth scrolling on iOS
+        }}
+      >
+        {/* Template Grid with Vertical Scrolling */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {templates.map((template, index) => (
+            <div
+              key={template.name}
+              className={`border-2 rounded-lg overflow-hidden cursor-pointer transition-all ${
+                selectedTemplate === template.name 
+                  ? 'border-blue-500 shadow-lg bg-blue-50' 
+                  : 'border-gray-200 hover:shadow-md bg-white'
+              }`}
+              onClick={() => handleTemplateClick(template)}
+            >
+              {/* Thumbnail */}
+              <div className="aspect-video bg-gray-50 flex items-center justify-center relative">
+                {thumbnailLoading[template.name] ? (
+                  <div className="text-center text-gray-400">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                    <div className="text-xs">Loading...</div>
+                  </div>
+                ) : (
+                  <>
+                    <img
+                      src={getTemplateThumbnail(template)}
+                      alt={getTemplateDisplayName(template, index)}
+                      className="w-full h-full object-contain"
+                      onError={(e) => {
+                        // If image fails to load, use fallback
+                        e.target.src = getFallbackThumbnail(template);
+                      }}
+                    />
+                    
+                    {/* Template Type Badge */}
+                    <div className="absolute top-2 right-2">
+                      <span className={`text-xs px-2 py-1 rounded-full ${
+                        template.type === 'application/json' 
+                          ? 'bg-green-100 text-green-800' 
+                          : 'bg-blue-100 text-blue-800'
+                      }`}>
+                        {template.type === 'application/json' ? 'JSON' : 'IMG'}
+                      </span>
+                    </div>
+
+                    {/* Selection Indicator */}
+                    {selectedTemplate === template.name && (
+                      <div className="absolute top-2 left-2">
+                        <div className="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+              
+              {/* Template Info */}
+              <div className="p-3 border-t">
+                <div className="flex justify-between items-start mb-1">
+                  <h3 className="font-medium text-sm text-gray-900 truncate flex-1">
+                    {getTemplateDisplayName(template, index)}
+                  </h3>
+                </div>
+                
+                {template.category && template.category !== 'Other' && (
+                  <span className="inline-block bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded mb-2">
+                    {template.category}
+                  </span>
+                )}
+                
+                <div className="flex justify-between items-center text-xs text-gray-500">
+                  <span>
+                    {template.type === 'application/json' ? 'JSON Template' : 'Image Template'}
+                  </span>
+                  <span>
+                    {formatFileSize(template.size)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
-      )}
-      
+        
+        {/* Empty State */}
+        {templates.length === 0 && (
+          <div className="text-center text-gray-500 py-8 border-2 border-dashed border-gray-300 rounded-lg">
+            <div className="text-lg mb-2">No templates available</div>
+            <div className="text-sm">Upload templates to get started</div>
+          </div>
+        )}
+      </div>
+
       {/* Refresh Button */}
-      <div className="mt-4 text-center">
+      <div className="p-4 border-t">
         <button
           onClick={loadTemplates}
-          className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md text-sm font-medium transition-colors"
+          className="w-full px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md text-sm font-medium transition-colors"
         >
           Refresh Templates
         </button>
