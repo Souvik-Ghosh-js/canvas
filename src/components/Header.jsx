@@ -1,8 +1,8 @@
 import React from "react";
-import { FolderOpenDot, Save, User, Mail } from "lucide-react";
+import { FolderOpenDot, Save, User, Mail, Download } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-function Header({ onExport, onOpen, onSave, onExportPDF, onSendEmail }) {
+function Header({ onExport, onOpen, onSave, onExportJSON, onExportCurrentJSON, onSendEmail }) {
   const navigate = useNavigate();
   
   return (
@@ -38,12 +38,26 @@ function Header({ onExport, onOpen, onSave, onExportPDF, onSendEmail }) {
             <span className="hidden md:inline">Email</span>
           </button>
           <button
-            className="bg-blue-500 p-2 rounded-md text-white px-2 md:px-3 cursor-pointer"
+            className="bg-blue-500 p-2 rounded-md text-white px-2 md:px-3 cursor-pointer flex items-center gap-1"
             onClick={onExport}
           >
-            PNG
+            <Download size={16} />
+            <span className="hidden md:inline">PNG</span>
           </button>
-          
+          <button
+            className="bg-purple-600 p-2 rounded-md text-white px-2 md:px-3 cursor-pointer flex items-center gap-1"
+            onClick={onExportJSON}
+          >
+            <Download size={16} />
+            <span className="hidden md:inline">Project JSON</span>
+          </button>
+          <button
+            className="bg-indigo-600 p-2 rounded-md text-white px-2 md:px-3 cursor-pointer flex items-center gap-1"
+            onClick={onExportCurrentJSON}
+          >
+            <Download size={16} />
+            <span className="hidden md:inline">Page JSON</span>
+          </button>
         </section>
       </section>
     </header>

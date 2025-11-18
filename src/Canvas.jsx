@@ -10,7 +10,7 @@ import BGTool from "./components/ui/BGTool";
 import LogoTool from "./components/ui/LogoTool";
 import UploadTool from "./components/ui/UploadTool";
 import SchoolNameTool from "./components/ui/SchoolNameTool";
-import TemplateTool from "./components/ui/Templatetool"; // Import TemplateTool
+import TemplateTool from "./components/ui/Templatetool";
 import ProjectsModal from "./components/modal/projectModal";
 import EmailModal from "./components/modal/emailModal";
 import ZoomBar from "./components/ui/Zoombar.jsx";
@@ -21,7 +21,7 @@ import {
   FaUpload,
   FaShapes,
   FaBuilding,
-  FaLayerGroup, // Add this import
+  FaLayerGroup,
 } from "react-icons/fa6";
 import { FaPaintBrush } from "react-icons/fa";
 import { IoImagesSharp, IoSettings } from "react-icons/io5";
@@ -35,7 +35,7 @@ import { addImage } from "./utils/imageTools";
 import { addBG } from "./utils/backGroundTool";
 import { addLogo } from "./utils/LogoTool";
 import { addWordCurve } from "./utils/wordCurveTool";
-import { applyTemplateToCanvas } from "./utils/templateUtils"; // Add this import
+import { applyTemplateToCanvas } from "./utils/templateUtils";
 import { bringForward, sendBackward } from "./utils/layerUtils";
 import { deleteActiveObject, handleDelete } from "./utils/deleteUtils";
 import {
@@ -59,7 +59,7 @@ import { exportMultipleJsonToPDF } from "./utils/exportMultiPagePDF";
 import { sendEmail } from "./utils/emailService";
 
 function App() {
-  const { canvasRef, canvas  , designSize} = useFabricCanvas();
+  const { canvasRef, canvas, designSize } = useFabricCanvas();
   const [canvasList, setCanvasList] = useState([{ id: 1, json: null }]);
   const [activePage, setActivePage] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -72,7 +72,13 @@ function App() {
   const [currentProjectUrl, setCurrentProjectUrl] = useState('');
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [currentProject, setCurrentProject] = useState(null);
-  const [zoom, setZoom] = useState(1); // 1 = 100%
+  const [zoom, setZoom] = useState(1);
+  
+  // New states for export modals
+  const [isProjectExportModalOpen, setIsProjectExportModalOpen] = useState(false);
+  const [isPageExportModalOpen, setIsPageExportModalOpen] = useState(false);
+  const [exportProjectName, setExportProjectName] = useState('');
+  const [exportPageName, setExportPageName] = useState('');
 
   const handleNavClick = (item) => {
     setIsModalOpen(true);
@@ -81,7 +87,10 @@ function App() {
 
   useEffect(() => {
     loadProjects();
-  }, []);
+    // Set default export names
+    setExportProjectName(currentProject?.project_name || "My Design");
+    setExportPageName(`${currentProject?.project_name || "design"}_page_${activePage}`);
+  }, [currentProject, activePage]);
 
   const loadProjects = async () => {
     const macId = getMacId();
@@ -90,21 +99,19 @@ function App() {
       setProjects(result.data);
     }
   };
- const handleZoomChange = (value) => {
+
+  const handleZoomChange = (value) => {
     if (!canvas) return;
 
     const zoomValue = parseFloat(value);
     setZoom(zoomValue);
 
-    // Apply zoom with limit
     canvas.setZoom(zoomValue);
-
-    // Keep the canvas centered
     canvas.setWidth(designSize.width * zoomValue);
     canvas.setHeight(designSize.height * zoomValue);
-
     canvas.requestRenderAll();
   };
+
   const handleOpenProjects = () => {
     setIsProjectsModalOpen(true);
   };
@@ -187,14 +194,97 @@ function App() {
     }
   };
 
-  // Add template handler function
-  const handleTemplateSelect = async (templateUrl) => {
+  // Updated template handler function
+  const handleTemplateSelect = async (template) => {
     try {
-      await applyTemplateToCanvas(canvas, templateUrl);
+      // Save current state for undo/redo
+      const originalState = canvas.toJSON();
+      
+      // Apply the template
+      await applyTemplateToCanvas(canvas, template);
+      
+      // Close the modal
       setIsModalOpen(false);
+      
     } catch (error) {
       console.error('Failed to apply template:', error);
       alert('Failed to load template. Please try again.');
+    }
+  };
+
+  // Open export modals
+  const handleOpenProjectExport = () => {
+    setExportProjectName(currentProject?.project_name || "My Design");
+    setIsProjectExportModalOpen(true);
+  };
+
+  const handleOpenPageExport = () => {
+    setExportPageName(`${currentProject?.project_name || "design"}_page_${activePage}`);
+    setIsPageExportModalOpen(true);
+  };
+
+  // Export project as JSON file
+  const exportProjectAsJson = (projectName) => {
+    try {
+      const projectData = {
+        project: projectName,
+        pages: canvasList,
+        exportDate: new Date().toISOString(),
+        version: "1.0",
+        totalPages: canvasList.length
+      };
+
+      const dataStr = JSON.stringify(projectData, null, 2);
+      const dataBlob = new Blob([dataStr], { type: "application/json" });
+
+      const url = URL.createObjectURL(dataBlob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${projectName}_project.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      setIsProjectExportModalOpen(false);
+      setExportProjectName('');
+      alert('Project exported as JSON successfully!');
+    } catch (error) {
+      console.error('Error exporting project as JSON:', error);
+      alert('Failed to export project as JSON');
+    }
+  };
+
+  // Export current canvas as JSON
+  const exportCurrentCanvasAsJson = (pageName) => {
+    try {
+      const canvasJson = canvas.toJSON();
+      const pageData = {
+        pageName: pageName,
+        pageNumber: activePage,
+        canvasData: canvasJson,
+        exportDate: new Date().toISOString(),
+        version: "1.0"
+      };
+
+      const dataStr = JSON.stringify(pageData, null, 2);
+      const dataBlob = new Blob([dataStr], { type: "application/json" });
+
+      const url = URL.createObjectURL(dataBlob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${pageName}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      setIsPageExportModalOpen(false);
+      setExportPageName('');
+      alert(`Page "${pageName}" exported as JSON successfully!`);
+    } catch (error) {
+      console.error('Error exporting canvas as JSON:', error);
+      alert('Failed to export canvas as JSON');
     }
   };
 
@@ -214,7 +304,7 @@ function App() {
     addWordArt_5: () => tools.addWordArt_5(canvas),
     addWordArt_6: () => tools.addWordArt_6(canvas),
     addWordArt_7: () => tools.addWordArt_7(canvas),
-    applyTemplate: (url) => applyTemplateToCanvas(canvas, url),
+    applyTemplate: (template) => applyTemplateToCanvas(canvas, template),
   };
 
   const addSchoolNameText = (text) => {
@@ -278,9 +368,12 @@ function App() {
         onExport={() => exportAsPNG(canvas)}
         onSave={handleSaveClick}
         onOpen={handleOpenProjects}
-        onExportPDF={() => exportMultipleJsonToPDF(canvasList, canvas)}
+        onExportJSON={handleOpenProjectExport}
+        onExportCurrentJSON={handleOpenPageExport}
         onSendEmail={() => setIsEmailModalOpen(true)}
       />
+      
+      {/* Save Modal */}
       <SaveModal
         isOpen={isSaveModalOpen}
         onClose={() => setIsSaveModalOpen(false)}
@@ -288,6 +381,89 @@ function App() {
         currentProject={currentProject}
         defaultName={currentProject?.project_name || "My Design"}
       />
+
+      {/* Project Export Modal */}
+      {isProjectExportModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-96">
+            <h3 className="text-lg font-semibold mb-4">Export Project as JSON</h3>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Project Name
+              </label>
+              <input
+                type="text"
+                value={exportProjectName}
+                onChange={(e) => setExportProjectName(e.target.value)}
+                placeholder="Enter project name"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                autoFocus
+              />
+            </div>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setIsProjectExportModalOpen(false);
+                  setExportProjectName('');
+                }}
+                className="px-4 py-2 text-gray-600 hover:text-gray-800"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => exportProjectAsJson(exportProjectName)}
+                disabled={!exportProjectName.trim()}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+              >
+                Export Project
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Page Export Modal */}
+      {isPageExportModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-96">
+            <h3 className="text-lg font-semibold mb-4">Export Page as JSON</h3>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Page Name
+              </label>
+              <input
+                type="text"
+                value={exportPageName}
+                onChange={(e) => setExportPageName(e.target.value)}
+                placeholder="Enter page name"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                autoFocus
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Current Page: {activePage} of {canvasList.length}
+              </p>
+            </div>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setIsPageExportModalOpen(false);
+                  setExportPageName('');
+                }}
+                className="px-4 py-2 text-gray-600 hover:text-gray-800"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => exportCurrentCanvasAsJson(exportPageName)}
+                disabled={!exportPageName.trim()}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+              >
+                Export Page
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <ProjectsModal
         isOpen={isProjectsModalOpen}
@@ -413,7 +589,7 @@ function App() {
           <FaIcons onClick={() => handleNavClick("School Logo")} />
           <FaBuilding onClick={() => handleNavClick("School Name")} />
           <FaUpload onClick={() => handleNavClick("Upload")} />
-          <FaLayerGroup onClick={() => handleNavClick("Templates")} /> {/* Add Template icon */}
+          <FaLayerGroup onClick={() => handleNavClick("Templates")} />
         </section>
 
         <IoSettings
@@ -452,9 +628,12 @@ function App() {
                   addSchoolName={(text) => addSchoolNameText(text)}
                 />
               )}
-              {/* Add Template Tool */}
+              {/* Updated Template Tool */}
               {tool === "Templates" && (
-                <TemplateTool onTemplateSelect={handleTemplateSelect} />
+                <TemplateTool 
+                  onTemplateSelect={handleTemplateSelect}
+                  canvas={canvas} // Pass canvas to TemplateTool
+                />
               )}
             </ToolModal>
 
@@ -518,8 +697,8 @@ function App() {
 
         {/* Canvas */}
         <div className="flex justify-center w-full mt-10" style={{
-    overflow: "auto", // 🔥 Enable scrollbar
-  }}>
+          overflow: "auto",
+        }}>
           <canvas ref={canvasRef}></canvas>
         </div>
 

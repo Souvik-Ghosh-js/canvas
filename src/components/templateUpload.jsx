@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { supabase } from "../supabase/config"; // Adjust path as needed
-import { Trash2, Download, Upload, Eye, FileText, Image } from "lucide-react";
+import { supabase } from "../supabase/config";
+import { Trash2, Download, Upload, Eye, FileText, Image, Code } from "lucide-react";
 
 const TemplateUpload = () => {
   const [activeSection, setActiveSection] = useState("upload");
@@ -13,9 +13,8 @@ const TemplateUpload = () => {
   const [message, setMessage] = useState({ type: "", text: "" });
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [categories, setCategories] = useState([]);
+  const [previewJson, setPreviewJson] = useState(null);
 
-  // Sample categories - you can make this dynamic
   const defaultCategories = [
     "Certificate",
     "Diploma", 
@@ -29,11 +28,9 @@ const TemplateUpload = () => {
     "Other"
   ];
 
-  // Load templates when component mounts or when activeSection changes to manage
   useEffect(() => {
     if (activeSection === "manage") {
       loadTemplates();
-      loadCategories();
     }
   }, [activeSection]);
 
@@ -54,8 +51,24 @@ const TemplateUpload = () => {
         data.map(async (file) => {
           const url = supabase.storage.from('templates').getPublicUrl(file.name).data.publicUrl;
           
-          // Try to get metadata from a separate table if you have one
-          // For now, we'll extract from filename
+          // For JSON files, try to extract preview and metadata
+          let previewUrl = null;
+          let jsonData = null;
+          
+          if (file.name.endsWith('.json')) {
+            try {
+              const response = await fetch(url);
+              jsonData = await response.json();
+              
+              // Extract preview from JSON if available
+              if (jsonData.backgroundImage) {
+                previewUrl = jsonData.backgroundImage;
+              }
+            } catch (e) {
+              console.warn('Could not parse JSON template:', file.name);
+            }
+          }
+          
           const metadata = extractMetadataFromFileName(file.name);
           
           return {
@@ -66,7 +79,9 @@ const TemplateUpload = () => {
             description: metadata.description,
             createdAt: file.created_at,
             size: file.metadata?.size || 0,
-            type: file.metadata?.mimetype || 'image/jpeg'
+            type: file.metadata?.mimetype || 'application/json',
+            previewUrl: previewUrl,
+            jsonData: jsonData
           };
         })
       );
@@ -80,14 +95,7 @@ const TemplateUpload = () => {
     }
   };
 
-  const loadCategories = async () => {
-    // If you have categories in a database table, load them here
-    // For now, using default categories
-    setCategories(defaultCategories);
-  };
-
   const extractMetadataFromFileName = (fileName) => {
-    // Extract metadata from filename pattern: category_name_description.extension
     const withoutExtension = fileName.replace(/\.[^/.]+$/, "");
     const parts = withoutExtension.split('_');
     
@@ -98,48 +106,81 @@ const TemplateUpload = () => {
     };
   };
 
-  const handleFileSelect = (e) => {
+  const handleFileSelect = async (e) => {
     const file = e.target.files[0];
     if (file) {
-      // Validate file type
+      // Validate file type - primarily JSON for templates
       const validTypes = [
+        "application/json",
         "image/jpeg", 
         "image/png", 
-        "image/webp", 
-        "image/svg+xml",
-        "application/json",
-        "application/pdf"
+        "image/webp"
       ];
       
       if (!validTypes.includes(file.type)) {
         setMessage({ 
           type: "error", 
-          text: "Please select a valid file (JPEG, PNG, WebP, SVG, JSON, PDF)" 
+          text: "Please select a valid file (JSON, JPEG, PNG, WebP)" 
         });
         setSelectedFile(null);
         setPreviewImage(null);
+        setPreviewJson(null);
         return;
       }
 
-      // Validate file size (max 10MB for templates)
-      if (file.size > 10 * 1024 * 1024) {
-        setMessage({ type: "error", text: "File size must be less than 10MB" });
+      // Validate file size (max 5MB for JSON templates)
+      if (file.size > 5 * 1024 * 1024) {
+        setMessage({ type: "error", text: "File size must be less than 5MB" });
         setSelectedFile(null);
         setPreviewImage(null);
+        setPreviewJson(null);
         return;
       }
 
       setSelectedFile(file);
       
-      // Create preview for images
-      if (file.type.startsWith('image/')) {
+      // Handle JSON files specifically
+      if (file.type === 'application/json') {
+        try {
+          const text = await file.text();
+          const jsonData = JSON.parse(text);
+          setPreviewJson(jsonData);
+          
+          // Extract preview image from JSON if available
+          if (jsonData.backgroundImage) {
+            setPreviewImage(jsonData.backgroundImage);
+          } else {
+            setPreviewImage(null);
+          }
+        } catch (error) {
+          setMessage({ 
+            type: "error", 
+            text: "Invalid JSON file. Please check the format." 
+          });
+          setSelectedFile(null);
+          setPreviewJson(null);
+          setPreviewImage(null);
+          return;
+        }
+      } else if (file.type.startsWith('image/')) {
+        // For image files, create preview
         setPreviewImage(URL.createObjectURL(file));
-      } else {
-        setPreviewImage(null);
+        setPreviewJson(null);
       }
       
       setMessage({ type: "", text: "" });
     }
+  };
+
+  const validateJsonTemplate = (jsonData) => {
+    // Basic validation for Fabric.js template structure
+    if (!jsonData) return false;
+    
+    // Check if it has basic Fabric.js structure
+    const hasObjects = Array.isArray(jsonData.objects) || jsonData.objects;
+    const hasBackground = jsonData.background || jsonData.backgroundImage;
+    
+    return hasObjects || hasBackground;
   };
 
   const uploadTemplate = async () => {
@@ -158,11 +199,21 @@ const TemplateUpload = () => {
       return;
     }
 
+    // Additional validation for JSON files
+    if (selectedFile.type === 'application/json' && previewJson) {
+      if (!validateJsonTemplate(previewJson)) {
+        setMessage({ 
+          type: "error", 
+          text: "Invalid template structure. Please check if it's a valid Fabric.js template." 
+        });
+        return;
+      }
+    }
+
     setUploading(true);
     setMessage({ type: "", text: "" });
 
     try {
-      // Create a sanitized filename with metadata
       const fileExtension = selectedFile.name.split('.').pop();
       const sanitizedName = templateName
         .toLowerCase()
@@ -178,11 +229,10 @@ const TemplateUpload = () => {
         .toLowerCase()
         .replace(/[^a-z0-9]/g, '_')
         .replace(/_+/g, '_')
-        .substring(0, 50); // Limit description length
+        .substring(0, 50);
 
       const fileName = `${sanitizedCategory}_${sanitizedName}_${sanitizedDescription}.${fileExtension}`;
 
-      // Upload to Supabase storage
       const { data, error } = await supabase.storage
         .from('templates')
         .upload(fileName, selectedFile, {
@@ -207,9 +257,11 @@ const TemplateUpload = () => {
       setTemplateDescription("");
       setSelectedFile(null);
       setPreviewImage(null);
+      setPreviewJson(null);
       document.getElementById('template-file-input').value = "";
 
-      // Reload the templates list
+      // Switch to manage section and reload
+      setActiveSection("manage");
       loadTemplates();
 
     } catch (error) {
@@ -235,7 +287,6 @@ const TemplateUpload = () => {
       setTemplates(prev => prev.filter(template => template.name !== fileName));
       setMessage({ type: "success", text: "Template deleted successfully!" });
       
-      // Clear message after 3 seconds
       setTimeout(() => setMessage({ type: "", text: "" }), 3000);
     } catch (error) {
       console.error('Error deleting template:', error);
@@ -272,11 +323,18 @@ const TemplateUpload = () => {
     if (fileType.startsWith('image/')) {
       return <Image size={20} className="text-blue-500" />;
     } else if (fileType === 'application/json') {
-      return <FileText size={20} className="text-green-500" />;
-    } else if (fileType === 'application/pdf') {
-      return <FileText size={20} className="text-red-500" />;
+      return <Code size={20} className="text-green-500" />;
     }
     return <FileText size={20} className="text-gray-500" />;
+  };
+
+  const previewTemplate = (template) => {
+    if (template.previewUrl) {
+      window.open(template.previewUrl, '_blank');
+    } else if (template.jsonData) {
+      // Show JSON data in alert or modal (you can enhance this)
+      alert(`Template: ${template.displayName}\nObjects: ${template.jsonData.objects?.length || 0}\nBackground: ${template.jsonData.background ? 'Yes' : 'No'}`);
+    }
   };
 
   return (
@@ -284,7 +342,7 @@ const TemplateUpload = () => {
       {/* Header */}
       <div className="p-6 border-b">
         <h3 className="text-xl font-semibold text-gray-800">Template Management</h3>
-        <p className="text-gray-600 mt-1">Upload and manage design templates for certificates, awards, and more</p>
+        <p className="text-gray-600 mt-1">Upload and manage JSON templates for certificates, awards, and more</p>
       </div>
 
       {/* Tabs */}
@@ -315,7 +373,6 @@ const TemplateUpload = () => {
 
       {/* Content */}
       <div className="p-6">
-        {/* Message Display */}
         {message.text && (
           <div
             className={`mb-6 p-4 rounded-lg ${
@@ -329,7 +386,6 @@ const TemplateUpload = () => {
         )}
 
         {activeSection === "upload" ? (
-          /* Upload Form */
           <div className="max-w-2xl">
             <div className="space-y-6">
               {/* Template Name Input */}
@@ -397,7 +453,7 @@ const TemplateUpload = () => {
                   <input
                     id="template-file-input"
                     type="file"
-                    accept=".jpg,.jpeg,.png,.webp,.svg,.json,.pdf"
+                    accept=".json,.jpg,.jpeg,.png,.webp"
                     onChange={handleFileSelect}
                     className="hidden"
                   />
@@ -414,23 +470,23 @@ const TemplateUpload = () => {
                     <div className="text-gray-500">
                       <Upload size={48} className="mx-auto mb-3 opacity-50" />
                       <p className="font-medium text-lg">Click to select or drag and drop</p>
-                      <p className="text-sm mt-2">Supports: Images (JPEG, PNG, WebP, SVG), JSON, PDF</p>
-                      <p className="text-xs mt-1">Maximum file size: 10MB</p>
+                      <p className="text-sm mt-2">Supports: JSON (Fabric.js templates), Images</p>
+                      <p className="text-xs mt-1">Maximum file size: 5MB</p>
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* Preview */}
+              {/* Preview Sections */}
               {previewImage && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Preview
+                    Template Preview
                   </label>
                   <div className="border rounded-lg p-4 max-w-xs bg-white">
                     <img
                       src={previewImage}
-                      alt="Preview"
+                      alt="Template preview"
                       className="max-h-40 mx-auto object-contain"
                     />
                     <p className="text-xs text-gray-500 text-center mt-2">
@@ -440,7 +496,28 @@ const TemplateUpload = () => {
                 </div>
               )}
 
-              {selectedFile && !previewImage && (
+              {previewJson && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    JSON Template Info
+                  </label>
+                  <div className="bg-gray-50 border rounded-lg p-4">
+                    <div className="flex items-center mb-2">
+                      <Code size={16} className="text-green-500 mr-2" />
+                      <span className="font-medium">Valid JSON Template</span>
+                    </div>
+                    <div className="text-sm text-gray-600 space-y-1">
+                      <p>• Objects: {previewJson.objects?.length || 0}</p>
+                      <p>• Background: {previewJson.background ? 'Yes' : 'No'}</p>
+                      <p>• Background Image: {previewJson.backgroundImage ? 'Yes' : 'No'}</p>
+                      <p>• Canvas Width: {previewJson.width || 'N/A'}</p>
+                      <p>• Canvas Height: {previewJson.height || 'N/A'}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {selectedFile && !previewImage && !previewJson && (
                 <div className="bg-gray-50 border rounded-lg p-4">
                   <div className="flex items-center justify-center">
                     {getFileIcon(selectedFile.type)}
@@ -478,13 +555,13 @@ const TemplateUpload = () => {
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <h4 className="font-medium text-blue-800 mb-2">Template Guidelines:</h4>
                 <ul className="text-sm text-blue-700 space-y-1">
-                  <li>• Use descriptive names that clearly identify the template purpose</li>
-                  <li>• Select appropriate categories for better organization</li>
-                  <li>• Include descriptions to help users understand the template usage</li>
-                  <li>• Supported formats: Images (JPEG, PNG, WebP, SVG), JSON, PDF</li>
-                  <li>• For JSON templates, ensure proper Fabric.js canvas structure</li>
-                  <li>• Maximum file size: 10MB</li>
-                  <li>• Recommended image dimensions: 1200x800 pixels or larger</li>
+                  <li>• <strong>JSON templates</strong> should follow Fabric.js canvas structure</li>
+                  <li>• Include <code>objects</code> array for canvas elements</li>
+                  <li>• Set <code>width</code> and <code>height</code> for canvas dimensions</li>
+                  <li>• Use <code>backgroundImage</code> for template backgrounds</li>
+                  <li>• For images, use high-quality PNG/JPEG files</li>
+                  <li>• Maximum file size: 5MB</li>
+                  <li>• Recommended canvas size: 1200x800 pixels or larger</li>
                 </ul>
               </div>
             </div>
@@ -511,7 +588,7 @@ const TemplateUpload = () => {
               </div>
             ) : templates.length === 0 ? (
               <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-lg">
-                <FileText size={48} className="mx-auto text-gray-400 mb-3" />
+                <Code size={48} className="mx-auto text-gray-400 mb-3" />
                 <p className="text-gray-500 text-lg">No templates found</p>
                 <p className="text-gray-400 mt-1">Upload your first template using the "Upload New" tab</p>
               </div>
@@ -520,9 +597,9 @@ const TemplateUpload = () => {
                 {templates.map((template, index) => (
                   <div key={index} className="border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow">
                     <div className="aspect-video bg-gray-50 p-4 flex items-center justify-center">
-                      {template.type.startsWith('image/') ? (
+                      {template.previewUrl ? (
                         <img
-                          src={template.url}
+                          src={template.previewUrl}
                           alt={template.displayName}
                           className="max-h-full max-w-full object-contain"
                           onError={(e) => {
@@ -533,8 +610,13 @@ const TemplateUpload = () => {
                         <div className="text-center text-gray-400">
                           {getFileIcon(template.type)}
                           <p className="text-xs mt-2 capitalize">
-                            {template.type.split('/')[1] || template.type.split('/')[0]} File
+                            {template.type === 'application/json' ? 'JSON Template' : template.type.split('/')[1]}
                           </p>
+                          {template.jsonData && (
+                            <p className="text-xs text-gray-500 mt-1">
+                              {template.jsonData.objects?.length || 0} objects
+                            </p>
+                          )}
                         </div>
                       )}
                     </div>
@@ -551,10 +633,17 @@ const TemplateUpload = () => {
                         </div>
                         
                         <div className="flex space-x-1 ml-2">
+                          <button
+                            onClick={() => previewTemplate(template)}
+                            className="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
+                            title="Preview"
+                          >
+                            <Eye size={16} />
+                          </button>
                           <a
                             href={template.url}
                             download={template.name}
-                            className="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
+                            className="p-1.5 text-green-600 hover:text-green-800 hover:bg-green-50 rounded transition-colors"
                             title="Download"
                           >
                             <Download size={16} />
