@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { getSchoolImages } from "../../utils/schoolutils"; // Adjust path as needed
+import { getSchoolImages } from "../../utils/schoolutils";
 
-function SchoolNameTool({ addSchoolName }) {
+function SchoolNameTool({ addSchoolLogo }) { // Changed prop name to addSchoolLogo
   const [schools, setSchools] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -24,13 +24,19 @@ function SchoolNameTool({ addSchoolName }) {
     }
   };
 
-  // Function to extract school name from filename (optional)
+  // Function to extract school name from filename
   const getSchoolNameFromFileName = (fileName) => {
-    // Remove file extension and replace underscores/dashes with spaces
     return fileName
-      .replace(/\.[^/.]+$/, "") // Remove extension
-      .replace(/[_-]/g, " ") // Replace underscores and dashes with spaces
-      .replace(/\b\w/g, l => l.toUpperCase()); // Capitalize first letter of each word
+      .replace(/\.[^/.]+$/, "")
+      .replace(/[_-]/g, " ")
+      .replace(/\b\w/g, l => l.toUpperCase());
+  };
+
+  // Handle logo click - pass the image URL instead of text
+  const handleLogoClick = (school) => {
+    if (addSchoolLogo && school.url) {
+      addSchoolLogo(school.url); // Pass the image URL, not text
+    }
   };
 
   if (loading) {
@@ -58,7 +64,7 @@ function SchoolNameTool({ addSchoolName }) {
               <div
                 key={index}
                 className="cursor-pointer group hover:bg-gray-50 rounded-lg p-2 transition-all duration-200"
-                onClick={() => addSchoolName(getSchoolNameFromFileName(school.name))}
+                onClick={() => handleLogoClick(school)} // Use the new handler
               >
                 <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
                   <img

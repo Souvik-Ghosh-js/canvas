@@ -28,7 +28,7 @@ import { IoImagesSharp, IoSettings } from "react-icons/io5";
 import { IoIosCloseCircle } from "react-icons/io";
 import { RiSendToBack, RiBringToFront } from "react-icons/ri";
 import SaveModal from "./components/modal/SaveModal.jsx";
-import {saveProjectToSupabase, getProjectsByMacId, getMacId, updateProjectInSupabase } from "./utils/supabaseUtils";
+import { saveProjectToSupabase, getProjectsByMacId, getMacId, updateProjectInSupabase } from "./utils/supabaseUtils";
 import useFabricCanvas from "./hooks/useFabricCanvas";
 import * as tools from "./utils/canvasTools";
 import { addImage } from "./utils/imageTools";
@@ -73,7 +73,7 @@ function App() {
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [currentProject, setCurrentProject] = useState(null);
   const [zoom, setZoom] = useState(1);
-  
+
   // New states for export modals
   const [isProjectExportModalOpen, setIsProjectExportModalOpen] = useState(false);
   const [isPageExportModalOpen, setIsPageExportModalOpen] = useState(false);
@@ -199,13 +199,13 @@ function App() {
     try {
       // Save current state for undo/redo
       const originalState = canvas.toJSON();
-      
+
       // Apply the template
       await applyTemplateToCanvas(canvas, template);
-      
+
       // Close the modal
       setIsModalOpen(false);
-      
+
     } catch (error) {
       console.error('Failed to apply template:', error);
       alert('Failed to load template. Please try again.');
@@ -321,38 +321,45 @@ function App() {
     );
   };
 
-  // Function to switch between pages
-// In your App component, update the switchPage function
-const switchPage = (pageId) => {
-  if (!canvas || activePage === pageId) return;
-
-  try {
-    // Save current page state
-    const updatedCanvasList = canvasList.map((page) =>
-      page.id === activePage ? { ...page, json: canvas.toJSON() } : page
-    );
-    
-    setCanvasList(updatedCanvasList);
-    setActivePage(pageId);
-    
-    // Load the selected page
-    const selectedPage = updatedCanvasList.find((p) => p.id === pageId);
-    
-    if (selectedPage?.json) {
-      canvas.loadFromJSON(selectedPage.json).then(() => {
-        canvas.requestRenderAll();
-      });
-    } else {
-      // Set default background for empty page
-      canvas.clear();
-      canvas.setBackgroundColor('#ffffff', () => {
-        canvas.requestRenderAll();
-      });
-    }
-  } catch (error) {
-    console.error('Error switching page:', error);
-  }
+  const addSchoolLogo = (imageUrl) => {
+  if (!canvas) return;
+  
+  // Use the existing addImage function to add the school logo
+  addImage(canvas, imageUrl);
 };
+
+  // Function to switch between pages
+  // In your App component, update the switchPage function
+  const switchPage = (pageId) => {
+    if (!canvas || activePage === pageId) return;
+
+    try {
+      // Save current page state
+      const updatedCanvasList = canvasList.map((page) =>
+        page.id === activePage ? { ...page, json: canvas.toJSON() } : page
+      );
+
+      setCanvasList(updatedCanvasList);
+      setActivePage(pageId);
+
+      // Load the selected page
+      const selectedPage = updatedCanvasList.find((p) => p.id === pageId);
+
+      if (selectedPage?.json) {
+        canvas.loadFromJSON(selectedPage.json).then(() => {
+          canvas.requestRenderAll();
+        });
+      } else {
+        // Set default background for empty page
+        canvas.clear();
+        canvas.setBackgroundColor('#ffffff', () => {
+          canvas.requestRenderAll();
+        });
+      }
+    } catch (error) {
+      console.error('Error switching page:', error);
+    }
+  };
 
   // --- Canvas event listeners
   useEffect(() => {
@@ -405,7 +412,7 @@ const switchPage = (pageId) => {
         onExportCurrentJSON={handleOpenPageExport}
         onSendEmail={() => setIsEmailModalOpen(true)}
       />
-      
+
       {/* Save Modal */}
       <SaveModal
         isOpen={isSaveModalOpen}
@@ -514,88 +521,88 @@ const switchPage = (pageId) => {
       />
 
       {/* Page Management Section */}
-<section className="flex gap-3 items-center px-5 py-2 bg-gray-100 border-b">
-  <button
-    className="bg-green-600 text-white px-3 py-1 rounded"
-    onClick={() => {
-      console.log('Creating new page...');
-      createNewPage({
-        canvas,
-        canvasList,
-        setCanvasList,
-        setActivePage,
-        activePage, // Add this line
-      });
-    }}
-  >
-    ➕ New Page
-  </button>
+      <section className="flex gap-3 items-center px-5 py-2 bg-gray-100 border-b">
+        <button
+          className="bg-green-600 text-white px-3 py-1 rounded"
+          onClick={() => {
+            console.log('Creating new page...');
+            createNewPage({
+              canvas,
+              canvasList,
+              setCanvasList,
+              setActivePage,
+              activePage, // Add this line
+            });
+          }}
+        >
+          ➕ New Page
+        </button>
 
-  <button
-    className="bg-blue-600 text-white px-3 py-1 rounded"
-    onClick={() => {
-      console.log('Duplicating page...');
-      duplicateCurrentPage({
-        canvas,
-        canvasList,
-        setCanvasList,
-        setActivePage,
-        activePage, // Add this line
-      });
-    }}
-  >
-    📄 Duplicate
-  </button>
+        <button
+          className="bg-blue-600 text-white px-3 py-1 rounded"
+          onClick={() => {
+            console.log('Duplicating page...');
+            duplicateCurrentPage({
+              canvas,
+              canvasList,
+              setCanvasList,
+              setActivePage,
+              activePage, // Add this line
+            });
+          }}
+        >
+          📄 Duplicate
+        </button>
 
-  <button
-    className="bg-red-500 text-white px-3 py-1 rounded"
-    onClick={() => {
-      console.log('Deleting page...');
-      deletePage({
-        canvas,
-        canvasList,
-        activePage,
-        setCanvasList,
-        setActivePage,
-      });
-    }}
-  >
-    ❌ Delete
-  </button>
+        <button
+          className="bg-red-500 text-white px-3 py-1 rounded"
+          onClick={() => {
+            console.log('Deleting page...');
+            deletePage({
+              canvas,
+              canvasList,
+              activePage,
+              setCanvasList,
+              setActivePage,
+            });
+          }}
+        >
+          ❌ Delete
+        </button>
 
-  {/* Page Selector */}
-  <select
-    value={activePage}
-    onChange={(e) => {
-      const pageId = Number(e.target.value);
-      console.log('Switching to page:', pageId);
-      switchPage(pageId);
-    }}
-    className="border px-2 py-1 rounded"
-  >
-    {canvasList.map((page, index) => (
-      <option key={page.id} value={page.id}>
-        Page {index + 1}
-      </option>
-    ))}
-  </select>
+        {/* Page Selector */}
+        <select
+          value={activePage}
+          onChange={(e) => {
+            const pageId = Number(e.target.value);
+            console.log('Switching to page:', pageId);
+            switchPage(pageId);
+          }}
+          className="border px-2 py-1 rounded"
+        >
+          {canvasList.map((page, index) => (
+            <option key={page.id} value={page.id}>
+              Page {index + 1}
+            </option>
+          ))}
+        </select>
 
-  <button
-    className="p-1 cursor-pointer"
-    disabled={!canUndo}
-    onClick={undo}
-  >
-    <Undo />
-  </button>
-  <button
-    className="p-1 cursor-pointer"
-    disabled={!canRedo}
-    onClick={redo}
-  >
-    <Redo />
-  </button>
-  <ZoomBar zoom={zoom} setZoom={handleZoomChange} />
-</section>
+        <button
+          className="p-1 cursor-pointer"
+          disabled={!canUndo}
+          onClick={undo}
+        >
+          <Undo />
+        </button>
+        <button
+          className="p-1 cursor-pointer"
+          disabled={!canRedo}
+          onClick={redo}
+        >
+          <Redo />
+        </button>
+        <ZoomBar zoom={zoom} setZoom={handleZoomChange} />
+      </section>
 
       {/* Page Scrollbar - Only show when more than 1 page */}
       {canvasList.length > 1 && (
@@ -609,11 +616,10 @@ const switchPage = (pageId) => {
                 <button
                   key={page.id}
                   onClick={() => switchPage(page.id)}
-                  className={`px-3 py-1 rounded-md text-sm font-medium whitespace-nowrap transition-colors min-w-[80px] ${
-                    activePage === page.id
+                  className={`px-3 py-1 rounded-md text-sm font-medium whitespace-nowrap transition-colors min-w-[80px] ${activePage === page.id
                       ? "bg-blue-600 text-white shadow-md"
                       : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                  }`}
+                    }`}
                 >
                   Page {index + 1}
                 </button>
@@ -685,12 +691,12 @@ const switchPage = (pageId) => {
               {tool === "Upload" && <UploadTool canvas={canvas} />}
               {tool === "School Name" && (
                 <SchoolNameTool
-                  addSchoolName={(text) => addSchoolNameText(text)}
+                  addSchoolLogo={(url) => addSchoolLogo(url)} // Changed to addSchoolLogo
                 />
               )}
               {/* Updated Template Tool */}
               {tool === "Templates" && (
-                <TemplateTool 
+                <TemplateTool
                   onTemplateSelect={handleTemplateSelect}
                   canvas={canvas} // Pass canvas to TemplateTool
                 />
