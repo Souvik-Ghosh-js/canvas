@@ -120,47 +120,88 @@ function App() {
     setIsProjectsModalOpen(true);
   };
 
-  const handleProjectSelect = (projectData) => {
+const handleProjectSelect = (projectData) => {
+  if (projectData.pages && Array.isArray(projectData.pages)) {
+    // Load the complete project with all pages
+    setCanvasList(projectData.pages);
+    
+    // Set the active page
+    const targetPage = projectData.activePage || 1;
+    setActivePage(targetPage);
+    
+    // Load the active page to canvas
+    const activePageData = projectData.pages.find(page => page.id === targetPage);
+    if (activePageData?.json) {
+      canvas.loadFromJSON(activePageData.json, () => {
+        canvas.renderAll();
+      });
+    } else {
+      canvas.clear();
+      canvas.setBackgroundColor('#ffffff', () => {
+        canvas.requestRenderAll();
+      });
+    }
+    
+    setCurrentProject(projectData);
+  } else {
+    // Fallback for old project format (single page)
     canvas.clear();
     canvas.loadFromJSON(projectData, () => {
       canvas.renderAll();
     });
     setCurrentProject(projectData);
-  };
+    // Reset to single page
+    setCanvasList([{ id: 1, json: projectData }]);
+    setActivePage(1);
+  }
+};
 
-  const handleSave = async (projectName = null, isUpdate = false) => {
-    try {
-      const macId = getMacId();
-      const canvasJson = canvas.toJSON();
+ const handleSave = async (projectName = null, isUpdate = false) => {
+  try {
+    const macId = getMacId();
+    
+    // Save current page state first
+    const updatedCanvasList = canvasList.map((page) =>
+      page.id === activePage ? { ...page, json: canvas.toJSON() } : page
+    );
+    
+    // Create project data with ALL pages
+    const projectData = {
+      pages: updatedCanvasList,
+      activePage: activePage,
+      totalPages: updatedCanvasList.length
+    };
 
-      let result;
+    let result;
 
-      if (isUpdate && currentProject && currentProject.id) {
-        result = await updateProjectInSupabase(
-          currentProject.id,
-          projectName,
-          canvasJson,
-          macId
-        );
-      } else {
-        result = await saveProjectToSupabase(projectName, canvasJson, macId);
-        if (result.success) {
-          setCurrentProject({ ...result.data[0], canvasData: canvasJson });
-        }
-      }
-
+    if (isUpdate && currentProject && currentProject.id) {
+      result = await updateProjectInSupabase(
+        currentProject.id,
+        projectName,
+        projectData, // Save the complete project data with all pages
+        macId
+      );
+    } else {
+      result = await saveProjectToSupabase(projectName, projectData, macId);
       if (result.success) {
-        console.log('Project saved successfully');
-        await loadProjects();
-        return true;
-      } else {
-        throw new Error(result.error);
+        setCurrentProject({ ...result.data[0], canvasData: projectData });
       }
-    } catch (error) {
-      console.error('Failed to save project:', error);
-      throw error;
     }
-  };
+
+    if (result.success) {
+      // Update local state with the saved pages
+      setCanvasList(updatedCanvasList);
+      console.log('Project saved successfully with', updatedCanvasList.length, 'pages');
+      await loadProjects();
+      return true;
+    } else {
+      throw new Error(result.error);
+    }
+  } catch (error) {
+    console.error('Failed to save project:', error);
+    throw error;
+  }
+};
 
   const handleSaveClick = () => {
     setIsSaveModalOpen(true);
@@ -236,36 +277,46 @@ function App() {
   };
 
   // Export project as JSON file
-  const exportProjectAsJson = (projectName) => {
-    try {
-      const projectData = {
-        project: projectName,
-        pages: canvasList,
-        exportDate: new Date().toISOString(),
-        version: "1.0",
-        totalPages: canvasList.length
-      };
+// Export project as JSON file
+const exportProjectAsJson = (projectName) => {
+  try {
+    // First save current page state
+    const updatedCanvasList = canvasList.map((page) =>
+      page.id === activePage ? { ...page, json: canvas.toJSON() } : page
+    );
 
-      const dataStr = JSON.stringify(projectData, null, 2);
-      const dataBlob = new Blob([dataStr], { type: "application/json" });
+    const projectData = {
+      project: projectName,
+      pages: updatedCanvasList,
+      activePage: activePage,
+      exportDate: new Date().toISOString(),
+      version: "1.0",
+      totalPages: updatedCanvasList.length
+    };
 
-      const url = URL.createObjectURL(dataBlob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `${projectName}_project.json`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+    const dataStr = JSON.stringify(projectData, null, 2);
+    const dataBlob = new Blob([dataStr], { type: "application/json" });
 
-      setIsProjectExportModalOpen(false);
-      setExportProjectName('');
-      alert('Project exported as JSON successfully!');
-    } catch (error) {
-      console.error('Error exporting project as JSON:', error);
-      alert('Failed to export project as JSON');
-    }
-  };
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${projectName}_project.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    // Update local state
+    setCanvasList(updatedCanvasList);
+
+    setIsProjectExportModalOpen(false);
+    setExportProjectName('');
+    alert(`Project exported with ${updatedCanvasList.length} pages successfully!`);
+  } catch (error) {
+    console.error('Error exporting project as JSON:', error);
+    alert('Failed to export project as JSON');
+  }
+};
 
   // Export current canvas as JSON
   const exportCurrentCanvasAsJson = (pageName) => {
@@ -341,36 +392,37 @@ function App() {
   };
 
   // Function to switch between pages
-  const switchPage = (pageId) => {
-    if (!canvas || activePage === pageId) return;
+// Function to switch between pages
+const switchPage = (pageId) => {
+  if (!canvas || activePage === pageId) return;
 
-    try {
-      // Save current page state
-      const updatedCanvasList = canvasList.map((page) =>
-        page.id === activePage ? { ...page, json: canvas.toJSON() } : page
-      );
+  try {
+    // Save current page state
+    const updatedCanvasList = canvasList.map((page) =>
+      page.id === activePage ? { ...page, json: canvas.toJSON() } : page
+    );
 
-      setCanvasList(updatedCanvasList);
-      setActivePage(pageId);
+    setCanvasList(updatedCanvasList);
+    setActivePage(pageId);
 
-      // Load the selected page
-      const selectedPage = updatedCanvasList.find((p) => p.id === pageId);
+    // Load the selected page
+    const selectedPage = updatedCanvasList.find((p) => p.id === pageId);
 
-      if (selectedPage?.json) {
-        canvas.loadFromJSON(selectedPage.json).then(() => {
-          canvas.requestRenderAll();
-        });
-      } else {
-        // Set default background for empty page
-        canvas.clear();
-        canvas.setBackgroundColor('#ffffff', () => {
-          canvas.requestRenderAll();
-        });
-      }
-    } catch (error) {
-      console.error('Error switching page:', error);
+    if (selectedPage?.json) {
+      canvas.loadFromJSON(selectedPage.json).then(() => {
+        canvas.requestRenderAll();
+      });
+    } else {
+      // Set default background for empty page
+      canvas.clear();
+      canvas.setBackgroundColor('#ffffff', () => {
+        canvas.requestRenderAll();
+      });
     }
-  };
+  } catch (error) {
+    console.error('Error switching page:', error);
+  }
+};
 
   // Enhanced layer control functions
   const handleBringForward = () => {
