@@ -147,81 +147,50 @@ export const applyTemplateToCanvas = async (canvas, template) => {
 const applyJsonTemplateToCanvas = (canvas, jsonData) => {
   return new Promise((resolve, reject) => {
     try {
-      // Handle all three JSON structures
+      // Handle JSON structures (same as before)
       let templateData;
-
-      if (
-        jsonData.pages &&
-        jsonData.pages.length > 0 &&
-        jsonData.pages[0].json
-      ) {
-        // Structure 3: Multi-page format - use first page's json
-        console.log("Applying multi-page template, using first page");
+      if (jsonData.pages && jsonData.pages.length > 0 && jsonData.pages[0].json) {
         templateData = jsonData.pages[0].json;
       } else if (jsonData.canvasData) {
-        // Structure 2: Custom wrapper format
-        console.log("Applying canvasData template");
         templateData = jsonData.canvasData;
       } else {
-        // Structure 1: Standard Fabric.js format
-        console.log("Applying standard Fabric.js template");
         templateData = jsonData;
       }
 
-      // Validate that we have valid template data
-      if (
-        !templateData ||
-        (!templateData.objects &&
-          !templateData.background &&
-          !templateData.backgroundImage)
-      ) {
+      if (!templateData) {
         throw new Error("Invalid template structure: No canvas data found");
       }
 
-      console.log("Template data to load:", {
-        objectsCount: templateData.objects?.length || 0,
-        hasBackground: !!templateData.background,
-        hasBackgroundImage: !!templateData.backgroundImage,
-        width: templateData.width,
-        height: templateData.height,
-      });
+      // Reset zoom to 1 before applying template
+      canvas.setZoom(1);
+      
+      // Use design size (logical size) for template application
+      const designWidth = 400; // Your base design width
+      const designHeight = 550; // Your base design height
+      
+      canvas.setWidth(designWidth);
+      canvas.setHeight(designHeight);
 
-      // Clear the canvas first
+      // Clear the canvas
       canvas.clear();
 
-      // Load the JSON template into the canvas
-      canvas.loadFromJSON(
-        templateData,
-        () => {
-          // Set canvas dimensions from template if available
-          if (templateData.width && templateData.height) {
-            canvas.setWidth(templateData.width);
-            canvas.setHeight(templateData.height);
-          }
-
-          console.log("Template applied successfully");
-
-          // Force multiple re-renders to ensure everything is visible
+      // Load template
+      canvas.loadFromJSON(templateData, () => {
+        // Re-apply the current zoom after loading template
+        const currentZoom = canvas.getZoom(); // This might be different now
+        canvas.setZoom(currentZoom);
+        canvas.setWidth(designWidth * currentZoom);
+        canvas.setHeight(designHeight * currentZoom);
+        
+        canvas.renderAll();
+        setTimeout(() => {
           canvas.renderAll();
-
-          // Additional re-render after a small delay to catch any async rendering issues
-          setTimeout(() => {
-            canvas.renderAll();
-          }, 50);
-
-          // One more render for good measure
-          requestAnimationFrame(() => {
-            canvas.renderAll();
-            resolve();
-          });
-        },
-        (error) => {
-          console.error("Error in canvas.loadFromJSON callback:", error);
-          reject(error);
-        }
-      );
+          resolve();
+        }, 50);
+      }, (error) => {
+        reject(error);
+      });
     } catch (error) {
-      console.error("Error in applyJsonTemplateToCanvas:", error);
       reject(error);
     }
   });
