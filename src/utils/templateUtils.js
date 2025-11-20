@@ -147,7 +147,9 @@ export const applyTemplateToCanvas = async (canvas, template) => {
 const applyJsonTemplateToCanvas = (canvas, jsonData) => {
   return new Promise((resolve, reject) => {
     try {
-      // Handle JSON structures (same as before)
+      // Detect device type (you can tweak breakpoint)
+      const zoom = window.innerWidth < 768 ? 0.8 : 1;
+
       let templateData;
       if (jsonData.pages && jsonData.pages.length > 0 && jsonData.pages[0].json) {
         templateData = jsonData.pages[0].json;
@@ -161,40 +163,31 @@ const applyJsonTemplateToCanvas = (canvas, jsonData) => {
         throw new Error("Invalid template structure: No canvas data found");
       }
 
-      // Reset zoom to 1 before applying template
-      canvas.setZoom(0.8);
-      
-      // Use design size (logical size) for template application
-      const designWidth = 400; // Your base design width
-      const designHeight = 550; // Your base design height
-      
+      const designWidth = 400;
+      const designHeight = 550;
+
+      canvas.setZoom(zoom);
       canvas.setWidth(designWidth);
       canvas.setHeight(designHeight);
-
-      // Clear the canvas
       canvas.clear();
 
-      // Load template
       canvas.loadFromJSON(templateData, () => {
-        // Re-apply the current zoom after loading template
-        const currentZoom = canvas.getZoom(); // This might be different now
-        canvas.setZoom(currentZoom);
-        canvas.setWidth(designWidth * currentZoom);
-        canvas.setHeight(designHeight * currentZoom);
-        
+        canvas.setZoom(zoom);
+        canvas.setWidth(designWidth * zoom);
+        canvas.setHeight(designHeight * zoom);
         canvas.renderAll();
+
         setTimeout(() => {
           canvas.renderAll();
           resolve();
         }, 50);
-      }, (error) => {
-        reject(error);
-      });
+      }, reject);
     } catch (error) {
       reject(error);
     }
   });
 };
+
 
 const applyImageTemplateToCanvas = (canvas, imageUrl) => {
   return new Promise((resolve, reject) => {
