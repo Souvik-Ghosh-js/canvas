@@ -9,7 +9,7 @@ import Settings from "./components/Settings";
 import ElementTool from "./components/ui/ElementTool";
 import BGTool from "./components/ui/BGTool";
 import LogoTool from "./components/ui/LogoTool";
-import {addElement} from "./utils/addElement.js";
+import { addElement } from "./utils/addElement.js";
 import UploadTool from "./components/ui/UploadTool";
 import SchoolNameTool from "./components/ui/SchoolNameTool";
 import TemplateTool from "./components/ui/TemplateTool.jsx";
@@ -30,7 +30,12 @@ import { IoImagesSharp, IoSettings } from "react-icons/io5";
 import { IoIosCloseCircle } from "react-icons/io";
 import { RiSendToBack, RiBringToFront } from "react-icons/ri";
 import SaveModal from "./components/modal/SaveModal.jsx";
-import { saveProjectToSupabase, getProjectsByMacId, getMacId, updateProjectInSupabase } from "./utils/supabaseUtils";
+import {
+  saveProjectToSupabase,
+  getProjectsByMacId,
+  getMacId,
+  updateProjectInSupabase,
+} from "./utils/supabaseUtils";
 import useFabricCanvas from "./hooks/useFabricCanvas";
 import * as tools from "./utils/canvasTools";
 import { addImage } from "./utils/imageTools";
@@ -71,17 +76,18 @@ function App() {
   const [projects, setProjects] = useState([]);
   const [isProjectsModalOpen, setIsProjectsModalOpen] = useState(false);
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
-  const [currentProjectUrl, setCurrentProjectUrl] = useState('');
+  const [currentProjectUrl, setCurrentProjectUrl] = useState("");
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [currentProject, setCurrentProject] = useState(null);
   const [zoom, setZoom] = useState(1);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // New states for export modals
-  const [isProjectExportModalOpen, setIsProjectExportModalOpen] = useState(false);
+  const [isProjectExportModalOpen, setIsProjectExportModalOpen] =
+    useState(false);
   const [isPageExportModalOpen, setIsPageExportModalOpen] = useState(false);
-  const [exportProjectName, setExportProjectName] = useState('');
-  const [exportPageName, setExportPageName] = useState('');
+  const [exportProjectName, setExportProjectName] = useState("");
+  const [exportPageName, setExportPageName] = useState("");
 
   const handleNavClick = (item) => {
     setIsModalOpen(true);
@@ -93,7 +99,9 @@ function App() {
     loadProjects();
     // Set default export names
     setExportProjectName(currentProject?.project_name || "My Design");
-    setExportPageName(`${currentProject?.project_name || "design"}_page_${activePage}`);
+    setExportPageName(
+      `${currentProject?.project_name || "design"}_page_${activePage}`
+    );
   }, [currentProject, activePage]);
 
   const loadProjects = async () => {
@@ -120,88 +128,94 @@ function App() {
     setIsProjectsModalOpen(true);
   };
 
-const handleProjectSelect = (projectData) => {
-  if (projectData.pages && Array.isArray(projectData.pages)) {
-    // Load the complete project with all pages
-    setCanvasList(projectData.pages);
-    
-    // Set the active page
-    const targetPage = projectData.activePage || 1;
-    setActivePage(targetPage);
-    
-    // Load the active page to canvas
-    const activePageData = projectData.pages.find(page => page.id === targetPage);
-    if (activePageData?.json) {
-      canvas.loadFromJSON(activePageData.json, () => {
+  const handleProjectSelect = (projectData) => {
+    if (projectData.pages && Array.isArray(projectData.pages)) {
+      // Load the complete project with all pages
+      setCanvasList(projectData.pages);
+
+      // Set the active page
+      const targetPage = projectData.activePage || 1;
+      setActivePage(targetPage);
+
+      // Load the active page to canvas
+      const activePageData = projectData.pages.find(
+        (page) => page.id === targetPage
+      );
+      if (activePageData?.json) {
+        canvas.loadFromJSON(activePageData.json, () => {
+          canvas.renderAll();
+        });
+      } else {
+        canvas.clear();
+        canvas.setBackgroundColor("#ffffff", () => {
+          canvas.requestRenderAll();
+        });
+      }
+
+      setCurrentProject(projectData);
+    } else {
+      // Fallback for old project format (single page)
+      canvas.clear();
+      canvas.loadFromJSON(projectData, () => {
         canvas.renderAll();
       });
-    } else {
-      canvas.clear();
-      canvas.setBackgroundColor('#ffffff', () => {
-        canvas.requestRenderAll();
-      });
+      setCurrentProject(projectData);
+      // Reset to single page
+      setCanvasList([{ id: 1, json: projectData }]);
+      setActivePage(1);
     }
-    
-    setCurrentProject(projectData);
-  } else {
-    // Fallback for old project format (single page)
-    canvas.clear();
-    canvas.loadFromJSON(projectData, () => {
-      canvas.renderAll();
-    });
-    setCurrentProject(projectData);
-    // Reset to single page
-    setCanvasList([{ id: 1, json: projectData }]);
-    setActivePage(1);
-  }
-};
+  };
 
- const handleSave = async (projectName = null, isUpdate = false) => {
-  try {
-    const macId = getMacId();
-    
-    // Save current page state first
-    const updatedCanvasList = canvasList.map((page) =>
-      page.id === activePage ? { ...page, json: canvas.toJSON() } : page
-    );
-    
-    // Create project data with ALL pages
-    const projectData = {
-      pages: updatedCanvasList,
-      activePage: activePage,
-      totalPages: updatedCanvasList.length
-    };
+  const handleSave = async (projectName = null, isUpdate = false) => {
+    try {
+      const macId = getMacId();
 
-    let result;
-
-    if (isUpdate && currentProject && currentProject.id) {
-      result = await updateProjectInSupabase(
-        currentProject.id,
-        projectName,
-        projectData, // Save the complete project data with all pages
-        macId
+      // Save current page state first
+      const updatedCanvasList = canvasList.map((page) =>
+        page.id === activePage ? { ...page, json: canvas.toJSON() } : page
       );
-    } else {
-      result = await saveProjectToSupabase(projectName, projectData, macId);
-      if (result.success) {
-        setCurrentProject({ ...result.data[0], canvasData: projectData });
-      }
-    }
 
-    if (result.success) {
-      // Update local state with the saved pages
-      setCanvasList(updatedCanvasList);
-      console.log('Project saved successfully with', updatedCanvasList.length, 'pages');
-      await loadProjects();
-      return true;
-    } else {
-      throw new Error(result.error);
+      // Create project data with ALL pages
+      const projectData = {
+        pages: updatedCanvasList,
+        activePage: activePage,
+        totalPages: updatedCanvasList.length,
+      };
+
+      let result;
+
+      if (isUpdate && currentProject && currentProject.id) {
+        result = await updateProjectInSupabase(
+          currentProject.id,
+          projectName,
+          projectData, // Save the complete project data with all pages
+          macId
+        );
+      } else {
+        result = await saveProjectToSupabase(projectName, projectData, macId);
+        if (result.success) {
+          setCurrentProject({ ...result.data[0], canvasData: projectData });
+        }
+      }
+
+      if (result.success) {
+        // Update local state with the saved pages
+        setCanvasList(updatedCanvasList);
+        console.log(
+          "Project saved successfully with",
+          updatedCanvasList.length,
+          "pages"
+        );
+        await loadProjects();
+        return true;
+      } else {
+        throw new Error(result.error);
+      }
+    } catch (error) {
+      console.error("Failed to save project:", error);
+      throw error;
     }
-  } catch (error) {
-    console.error('Failed to save project:', error);
-    throw error;
-  }
-};
+  };
 
   const handleSaveClick = () => {
     setIsSaveModalOpen(true);
@@ -217,9 +231,9 @@ const handleProjectSelect = (projectData) => {
 
       await handleSave(projectName, isUpdate);
       setIsSaveModalOpen(false);
-      alert('Project saved successfully!');
+      alert("Project saved successfully!");
     } catch (error) {
-      alert('Failed to save project: ' + error.message);
+      alert("Failed to save project: " + error.message);
     }
   };
 
@@ -228,21 +242,20 @@ const handleProjectSelect = (projectData) => {
       const imageResult = await uploadCanvasToImagesBucket(canvas, projectName);
 
       if (!imageResult.success) {
-        throw new Error('Failed to upload image: ' + imageResult.error);
+        throw new Error("Failed to upload image: " + imageResult.error);
       }
 
-      console.log('Image uploaded to:', imageResult.imageUrl);
+      console.log("Image uploaded to:", imageResult.imageUrl);
       await sendEmail(email, projectName, imageResult.imageUrl, projectName);
-
     } catch (error) {
-      throw new Error('Failed to send email: ' + error.message);
+      throw new Error("Failed to send email: " + error.message);
     }
   };
 
   // Updated template handler function
   const handleTemplateSelect = async (template) => {
     try {
-      console.log('Applying template:', template.name);
+      console.log("Applying template:", template.name);
 
       // Apply the template
       await applyTemplateToCanvas(canvas, template);
@@ -252,16 +265,15 @@ const handleProjectSelect = (projectData) => {
       canvas.requestRenderAll();
 
       // Force a state update to trigger React re-render
-      setCanvasList(prev => [...prev]);
+      setCanvasList((prev) => [...prev]);
 
       // Close the modal after a small delay to ensure rendering is complete
       setTimeout(() => {
         setIsModalOpen(false);
       }, 100);
-
     } catch (error) {
-      console.error('Failed to apply template:', error);
-      alert('Failed to load template. Please try again.');
+      console.error("Failed to apply template:", error);
+      alert("Failed to load template. Please try again.");
     }
   };
 
@@ -272,51 +284,55 @@ const handleProjectSelect = (projectData) => {
   };
 
   const handleOpenPageExport = () => {
-    setExportPageName(`${currentProject?.project_name || "design"}_page_${activePage}`);
+    setExportPageName(
+      `${currentProject?.project_name || "design"}_page_${activePage}`
+    );
     setIsPageExportModalOpen(true);
   };
 
   // Export project as JSON file
-// Export project as JSON file
-const exportProjectAsJson = (projectName) => {
-  try {
-    // First save current page state
-    const updatedCanvasList = canvasList.map((page) =>
-      page.id === activePage ? { ...page, json: canvas.toJSON() } : page
-    );
+  // Export project as JSON file
+  const exportProjectAsJson = (projectName) => {
+    try {
+      // First save current page state
+      const updatedCanvasList = canvasList.map((page) =>
+        page.id === activePage ? { ...page, json: canvas.toJSON() } : page
+      );
 
-    const projectData = {
-      project: projectName,
-      pages: updatedCanvasList,
-      activePage: activePage,
-      exportDate: new Date().toISOString(),
-      version: "1.0",
-      totalPages: updatedCanvasList.length
-    };
+      const projectData = {
+        project: projectName,
+        pages: updatedCanvasList,
+        activePage: activePage,
+        exportDate: new Date().toISOString(),
+        version: "1.0",
+        totalPages: updatedCanvasList.length,
+      };
 
-    const dataStr = JSON.stringify(projectData, null, 2);
-    const dataBlob = new Blob([dataStr], { type: "application/json" });
+      const dataStr = JSON.stringify(projectData, null, 2);
+      const dataBlob = new Blob([dataStr], { type: "application/json" });
 
-    const url = URL.createObjectURL(dataBlob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `${projectName}_project.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+      const url = URL.createObjectURL(dataBlob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${projectName}_project.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
 
-    // Update local state
-    setCanvasList(updatedCanvasList);
+      // Update local state
+      setCanvasList(updatedCanvasList);
 
-    setIsProjectExportModalOpen(false);
-    setExportProjectName('');
-    alert(`Project exported with ${updatedCanvasList.length} pages successfully!`);
-  } catch (error) {
-    console.error('Error exporting project as JSON:', error);
-    alert('Failed to export project as JSON');
-  }
-};
+      setIsProjectExportModalOpen(false);
+      setExportProjectName("");
+      alert(
+        `Project exported with ${updatedCanvasList.length} pages successfully!`
+      );
+    } catch (error) {
+      console.error("Error exporting project as JSON:", error);
+      alert("Failed to export project as JSON");
+    }
+  };
 
   // Export current canvas as JSON
   const exportCurrentCanvasAsJson = (pageName) => {
@@ -327,7 +343,7 @@ const exportProjectAsJson = (projectName) => {
         pageNumber: activePage,
         canvasData: canvasJson,
         exportDate: new Date().toISOString(),
-        version: "1.0"
+        version: "1.0",
       };
 
       const dataStr = JSON.stringify(pageData, null, 2);
@@ -343,11 +359,11 @@ const exportProjectAsJson = (projectName) => {
       URL.revokeObjectURL(url);
 
       setIsPageExportModalOpen(false);
-      setExportPageName('');
+      setExportPageName("");
       alert(`Page "${pageName}" exported as JSON successfully!`);
     } catch (error) {
-      console.error('Error exporting canvas as JSON:', error);
-      alert('Failed to export canvas as JSON');
+      console.error("Error exporting canvas as JSON:", error);
+      alert("Failed to export canvas as JSON");
     }
   };
 
@@ -369,7 +385,6 @@ const exportProjectAsJson = (projectName) => {
     addWordArt_7: () => tools.addWordArt_7(canvas),
     applyTemplate: (template) => applyTemplateToCanvas(canvas, template),
     addElement: (url) => addElement(canvas, url), // Add this line
-
   };
 
   const addSchoolNameText = (text) => {
@@ -392,37 +407,44 @@ const exportProjectAsJson = (projectName) => {
   };
 
   // Function to switch between pages
-// Function to switch between pages
-const switchPage = (pageId) => {
-  if (!canvas || activePage === pageId) return;
+  // Function to switch between pages
+  const switchPage = (pageId) => {
+    if (!canvas || activePage === pageId) return;
+    try {
+      // Save current page state
+      const updatedCanvasList = canvasList.map((page) =>
+        page.id === activePage ? { ...page, json: canvas.toJSON() } : page
+      );
 
-  try {
-    // Save current page state
-    const updatedCanvasList = canvasList.map((page) =>
-      page.id === activePage ? { ...page, json: canvas.toJSON() } : page
-    );
+      setCanvasList(updatedCanvasList);
+      setActivePage(pageId);
 
-    setCanvasList(updatedCanvasList);
-    setActivePage(pageId);
+      // Load the selected page
+      const selectedPage = updatedCanvasList.find((p) => p.id === pageId);
+      const currentWidth = canvas.getWidth();
+      const currentHeight = canvas.getHeight();
 
-    // Load the selected page
-    const selectedPage = updatedCanvasList.find((p) => p.id === pageId);
-
-    if (selectedPage?.json) {
-      canvas.loadFromJSON(selectedPage.json).then(() => {
-        canvas.requestRenderAll();
-      });
-    } else {
-      // Set default background for empty page
-      canvas.clear();
-      canvas.setBackgroundColor('#ffffff', () => {
-        canvas.requestRenderAll();
-      });
+      if (selectedPage.json.backgroundImage) {
+        const scaleX = currentWidth / selectedPage.json.backgroundImage.width;
+        const scaleY = currentHeight / selectedPage.json.backgroundImage.height;
+        selectedPage.json.backgroundImage.scaleX = scaleX;
+        selectedPage.json.backgroundImage.scaleY = scaleY;
+      }
+      if (selectedPage?.json) {
+        canvas.loadFromJSON(selectedPage.json).then(() => {
+          canvas.requestRenderAll();
+        });
+      } else {
+        // Set default background for empty page
+        canvas.clear();
+        canvas.setBackgroundColor("#ffffff", () => {
+          canvas.requestRenderAll();
+        });
+      }
+    } catch (error) {
+      console.error("Error switching page:", error);
     }
-  } catch (error) {
-    console.error('Error switching page:', error);
-  }
-};
+  };
 
   // Enhanced layer control functions
   const handleBringForward = () => {
@@ -463,11 +485,11 @@ const switchPage = (pageId) => {
         )
       );
     };
-    
+
     const handleChange = () => {
       saveCurrentPage();
     };
-    
+
     const handleSelection = () => {
       const activeObject = canvas.getActiveObject();
       setShowDelete(!!activeObject);
@@ -499,7 +521,7 @@ const switchPage = (pageId) => {
   const { undo, redo, canUndo, canRedo } = useHistory(canvas);
 
   return (
-    <div className="bg-gradient-to-br from-slate-50 to-blue-50 flex h-screen w-full flex-col overflow-hidden">
+    <div className="bg-linear-to-br from-slate-50 to-blue-50 flex w-full  flex-col overflow-hidden">
       {/* Modern Header */}
       <Header
         onExport={() => exportAsPNG(canvas)}
@@ -523,7 +545,9 @@ const switchPage = (pageId) => {
       {isProjectExportModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-2xl">
-            <h3 className="text-lg font-bold mb-4 text-gray-800">Export Project as JSON</h3>
+            <h3 className="text-lg font-bold mb-4 text-gray-800">
+              Export Project as JSON
+            </h3>
             <div className="mb-4">
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Project Name
@@ -541,7 +565,7 @@ const switchPage = (pageId) => {
               <button
                 onClick={() => {
                   setIsProjectExportModalOpen(false);
-                  setExportProjectName('');
+                  setExportProjectName("");
                 }}
                 className="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium transition-colors"
               >
@@ -563,7 +587,9 @@ const switchPage = (pageId) => {
       {isPageExportModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-2xl">
-            <h3 className="text-lg font-bold mb-4 text-gray-800">Export Page as JSON</h3>
+            <h3 className="text-lg font-bold mb-4 text-gray-800">
+              Export Page as JSON
+            </h3>
             <div className="mb-4">
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Page Name
@@ -584,7 +610,7 @@ const switchPage = (pageId) => {
               <button
                 onClick={() => {
                   setIsPageExportModalOpen(false);
-                  setExportPageName('');
+                  setExportPageName("");
                 }}
                 className="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium transition-colors"
               >
@@ -625,13 +651,13 @@ const switchPage = (pageId) => {
             <button
               className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white px-3 py-2 rounded-lg font-semibold transition-all duration-200 flex items-center gap-2 shadow-md hover:shadow-lg whitespace-nowrap flex-shrink-0"
               onClick={() => {
-                createNewPage({
+                createNewPage(
                   canvas,
                   canvasList,
                   setCanvasList,
                   setActivePage,
-                  activePage,
-                });
+                  activePage
+                );
               }}
               title="Create New Page"
             >
@@ -776,7 +802,9 @@ const switchPage = (pageId) => {
               className={`p-3 hover:bg-${color}-50 rounded-xl transition-all duration-200 border border-transparent hover:border-${color}-200 hover:shadow-sm group`}
               title={id}
             >
-              <Icon className={`text-xl text-${color}-600 group-hover:scale-110 transition-transform`} />
+              <Icon
+                className={`text-xl text-${color}-600 group-hover:scale-110 transition-transform`}
+              />
             </button>
           ))}
         </section>
@@ -796,7 +824,9 @@ const switchPage = (pageId) => {
               className={`p-2 hover:bg-${color}-50 rounded-lg transition-all duration-200 border border-transparent hover:border-${color}-200 hover:shadow-sm group flex-shrink-0`}
               title={id}
             >
-              <Icon className={`text-lg text-${color}-600 group-hover:scale-110 transition-transform`} />
+              <Icon
+                className={`text-lg text-${color}-600 group-hover:scale-110 transition-transform`}
+              />
             </button>
           ))}
         </section>
@@ -814,16 +844,18 @@ const switchPage = (pageId) => {
       <main className="flex flex-1 overflow-hidden relative">
         {/* Mobile Sidebar Overlay */}
         {mobileMenuOpen && (
-          <div 
+          <div
             className="fixed inset-0 bg-black/20 z-40 md:hidden"
             onClick={() => setMobileMenuOpen(false)}
           />
         )}
 
         {/* Sidebar */}
-        <div className={`bg-white h-full w-64 z-50 transition-all duration-300 md:relative md:translate-x-0 fixed top-0 left-0 shadow-xl ${
-          mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
-        } md:shadow-none`}>
+        <div
+          className={`bg-white h-full w-64 z-50 transition-all duration-300 md:relative md:translate-x-0 fixed top-0 left-0 shadow-xl ${
+            mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+          } md:shadow-none`}
+        >
           <div className="flex justify-between items-center p-4 border-b border-gray-200 md:hidden">
             <h2 className="text-lg font-bold text-gray-800">Design Tools</h2>
             <button
@@ -833,7 +865,7 @@ const switchPage = (pageId) => {
               <X size={20} />
             </button>
           </div>
-          
+
           <section className="h-full overflow-y-auto p-4">
             <ToolModal
               isOpen={isModalOpen}
@@ -857,20 +889,19 @@ const switchPage = (pageId) => {
               )}
               {tool === "Upload" && <UploadTool canvas={canvas} />}
               {tool === "School Name" && (
-                <SchoolNameTool
-                  addSchoolLogo={(url) => addSchoolLogo(url)}
-                />
+                <SchoolNameTool addSchoolLogo={(url) => addSchoolLogo(url)} />
               )}
               {tool === "Templates" && (
                 <TemplateTool
                   onTemplateSelect={handleTemplateSelect}
                   canvas={canvas}
+                  setActivePage={setActivePage}
+                  setCanvasList={setCanvasList}
                 />
               )}
               {tool === "Elements" && (
                 <ElementTool action={(url) => addElement(canvas, url)} />
               )}
-
             </ToolModal>
 
             <section className="mt-2">
@@ -879,11 +910,26 @@ const switchPage = (pageId) => {
               </h1>
               <section className="space-y-2">
                 {[
-                  { text: "Text", icon: <FaTextHeight className="text-blue-600" /> },
-                  { text: "Images", icon: <IoImagesSharp className="text-green-600" /> },
-                  { text: "Shapes", icon: <FaShapes className="text-purple-600" /> },
-                  { text: "Background", icon: <FaPaintBrush className="text-orange-600" /> },
-                  { text: "Templates", icon: <FaLayerGroup className="text-indigo-600" /> },
+                  {
+                    text: "Text",
+                    icon: <FaTextHeight className="text-blue-600" />,
+                  },
+                  {
+                    text: "Images",
+                    icon: <IoImagesSharp className="text-green-600" />,
+                  },
+                  {
+                    text: "Shapes",
+                    icon: <FaShapes className="text-purple-600" />,
+                  },
+                  {
+                    text: "Background",
+                    icon: <FaPaintBrush className="text-orange-600" />,
+                  },
+                  {
+                    text: "Templates",
+                    icon: <FaLayerGroup className="text-indigo-600" />,
+                  },
                 ].map((item) => (
                   <ToolButton
                     key={item.text}
@@ -900,10 +946,22 @@ const switchPage = (pageId) => {
                 </h1>
                 <section className="space-y-2">
                   {[
-                    { text: "School Name", icon: <FaIcons className="text-teal-600" /> },
-                    { text: "School Logo", icon: <FaListUl className="text-red-600" /> },
-                    { text: "Upload", icon: <FaUpload className="text-gray-600" /> },
-                    { text: "Elements", icon: <FaShapes className="text-purple-600" /> },
+                    {
+                      text: "School Name",
+                      icon: <FaIcons className="text-teal-600" />,
+                    },
+                    {
+                      text: "School Logo",
+                      icon: <FaListUl className="text-red-600" />,
+                    },
+                    {
+                      text: "Upload",
+                      icon: <FaUpload className="text-gray-600" />,
+                    },
+                    {
+                      text: "Elements",
+                      icon: <FaShapes className="text-purple-600" />,
+                    },
                   ].map((item) => (
                     <ToolButton
                       key={item.text}
@@ -922,10 +980,7 @@ const switchPage = (pageId) => {
         <div className="flex-1 flex items-center justify-center p-2 md:p-4 lg:p-6 overflow-auto bg-gradient-to-br from-slate-100 to-blue-100/50 relative">
           {/* Clean Canvas Container */}
           <div className="bg-white rounded-xl shadow-lg border border-gray-200/50 max-w-full">
-            <canvas 
-              ref={canvasRef}
-              className="block rounded-lg max-w-full"
-            />
+            <canvas ref={canvasRef} className="block rounded-lg max-w-full" />
           </div>
 
           {/* Floating Object Controls */}
@@ -958,9 +1013,9 @@ const switchPage = (pageId) => {
         </div>
 
         {/* Settings Sidebar */}
-        <Settings 
-          canvas={canvas} 
-          isSideBarOpen={isSideBarOpen} 
+        <Settings
+          canvas={canvas}
+          isSideBarOpen={isSideBarOpen}
           onClose={() => setSideBarOpen(false)}
         />
       </main>

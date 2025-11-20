@@ -16,17 +16,16 @@ export const initBlankCanvas = (
 };
 
 // Create a fresh empty page
-export const createNewPage = ({
+export const createNewPage = (
   canvas,
   canvasList,
   setCanvasList,
   setActivePage,
-  activePage, // Add this parameter
-}) => {
+  activePage
+) => {
   if (!canvas) return;
-
   // First, save the current page state
-  const updatedCanvasList = canvasList.map(page => {
+  const updatedCanvasList = canvasList.map((page) => {
     if (page.id === activePage) {
       return { ...page, json: canvas.toJSON() };
     }
@@ -50,8 +49,6 @@ export const createNewPage = ({
   setCanvasList(newCanvasList);
   setActivePage(id);
 
-  // Clear and set up new page
-  canvas.clear();
   canvas.loadFromJSON(json).then(() => {
     canvas.requestRenderAll();
   });
@@ -70,24 +67,24 @@ export const duplicateCurrentPage = ({
   if (!canvas || !activePage) return;
 
   // First, save the current page state
-  const updatedCanvasList = canvasList.map(page => {
+  const updatedCanvasList = canvasList.map((page) => {
     if (page.id === activePage) {
       return { ...page, json: canvas.toJSON() };
     }
     return page;
   });
 
-  const currentPage = canvasList.find(page => page.id === activePage);
+  const currentPage = canvasList.find((page) => page.id === activePage);
   const id = Date.now();
 
   const newCanvasList = [
     ...updatedCanvasList,
-    { 
-      id, 
+    {
+      id,
       json: currentPage?.json || {
         version: "6.7.1",
         background: "#ffffff",
-      }
+      },
     },
   ];
 
@@ -95,12 +92,16 @@ export const duplicateCurrentPage = ({
   setActivePage(id);
 
   // Load the duplicated content
-  canvas.loadFromJSON(currentPage?.json || {
-    version: "6.7.1",
-    background: "#ffffff",
-  }).then(() => {
-    canvas.requestRenderAll();
-  });
+  canvas
+    .loadFromJSON(
+      currentPage?.json || {
+        version: "6.7.1",
+        background: "#ffffff",
+      }
+    )
+    .then(() => {
+      canvas.requestRenderAll();
+    });
 
   return id;
 };
@@ -117,7 +118,11 @@ export const loadPageToCanvas = ({ canvas, json, pageDefaults = {} }) => {
     });
   } else {
     // Set up blank page with defaults
-    const { width = 300, height = 425, backgroundColor = "#ffffff" } = pageDefaults;
+    const {
+      width = 300,
+      height = 425,
+      backgroundColor = "#ffffff",
+    } = pageDefaults;
     canvas.setWidth(width);
     canvas.setHeight(height);
     canvas.backgroundColor = backgroundColor;
@@ -136,9 +141,11 @@ export const deletePage = ({
   if (!canvas || !activePage) return;
 
   // Save current page state before deletion
-  const updatedList = canvasList.map(page => 
-    page.id === activePage ? { ...page, json: canvas.toJSON() } : page
-  ).filter((page) => page.id !== activePage);
+  const updatedList = canvasList
+    .map((page) =>
+      page.id === activePage ? { ...page, json: canvas.toJSON() } : page
+    )
+    .filter((page) => page.id !== activePage);
 
   if (updatedList.length === 0) {
     // Create new blank page if all deleted
