@@ -13,10 +13,13 @@ const TemplateTool = ({
   setActivePage,
 }) => {
   const [templates, setTemplates] = useState([]);
+  const [filteredTemplates, setFilteredTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [thumbnails, setThumbnails] = useState({});
   const [thumbnailLoading, setThumbnailLoading] = useState({});
   const [selectedTemplate, setSelectedTemplate] = useState(null);
+  const [selectedCategory, setSelectedCategory] = useState("All");
+  const [categories, setCategories] = useState(["All"]);
   const scrollContainerRef = useRef(null);
 
   useEffect(() => {
@@ -27,8 +30,20 @@ const TemplateTool = ({
   useEffect(() => {
     if (templates.length > 0) {
       generateThumbnails();
+      extractCategories();
     }
   }, [templates]);
+
+  // Filter templates when category changes
+  useEffect(() => {
+    if (selectedCategory === "All") {
+      setFilteredTemplates(templates);
+    } else {
+      setFilteredTemplates(
+        templates.filter((template) => template.category === selectedCategory)
+      );
+    }
+  }, [selectedCategory, templates]);
 
   const loadTemplates = async () => {
     try {
@@ -36,6 +51,7 @@ const TemplateTool = ({
       const result = await getTemplatesFromBucket();
       if (result.success) {
         setTemplates(result.templates);
+        setFilteredTemplates(result.templates);
       } else {
         console.error("Failed to load templates:", result.error);
       }
@@ -44,6 +60,11 @@ const TemplateTool = ({
     } finally {
       setLoading(false);
     }
+  };
+
+  const extractCategories = () => {
+    const uniqueCategories = [...new Set(templates.map(t => t.category).filter(Boolean))];
+    setCategories(["All", ...uniqueCategories]);
   };
 
   const generateThumbnails = async () => {
@@ -57,7 +78,6 @@ const TemplateTool = ({
         if (thumbnail) {
           newThumbnails[template.name] = thumbnail;
         } else {
-          // Use fallback for failed thumbnails
           newThumbnails[template.name] = getFallbackThumbnail(template);
         }
       } catch (error) {
@@ -73,6 +93,8 @@ const TemplateTool = ({
   };
 
   const handleTemplateClick = async (template) => {
+    setSelectedTemplate(template.name);
+    
     if (!canvas) {
       console.error("Canvas not available");
       return;
@@ -94,19 +116,14 @@ const TemplateTool = ({
       });
 
       try {
-        // Apply template to canvas
         await applyTemplateToCanvas(canvas, template);
-
         console.log("Template applied successfully");
 
-        // Notify parent component
         if (onTemplateSelect) {
           onTemplateSelect(template);
         }
       } catch (error) {
         console.error("Error applying template:", error);
-
-        // More detailed error message
         let errorMessage = "Failed to apply template. Please try again.";
 
         if (error.message.includes("Invalid template structure")) {
@@ -123,32 +140,31 @@ const TemplateTool = ({
   };
 
   const getFallbackThumbnail = (template) => {
-    if (template.type === "application/json") {
-      return `data:image/svg+xml;base64,${btoa(`
-        <svg width="200" height="150" viewBox="0 0 200 150" xmlns="http://www.w3.org/2000/svg">
-          <rect width="200" height="150" fill="#f8f9fa"/>
-          <rect x="50" y="50" width="100" height="50" fill="#e9ecef" stroke="#6c757d" stroke-width="1"/>
-          <text x="100" y="75" text-anchor="middle" dominant-baseline="middle" font-family="Arial" font-size="12" fill="#6c757d">JSON Template</text>
-          <text x="100" y="95" text-anchor="middle" dominant-baseline="middle" font-family="Arial" font-size="10" fill="#6c757d">${
-            template.displayName || template.name
-          }</text>
-        </svg>
-      `)}`;
-    } else {
-      return `data:image/svg+xml;base64,${btoa(`
-        <svg width="200" height="150" viewBox="0 0 200 150" xmlns="http://www.w3.org/2000/svg">
-          <rect width="200" height="150" fill="#f8f9fa"/>
-          <rect x="60" y="50" width="80" height="60" fill="#e9ecef" stroke="#6c757d" stroke-width="1"/>
-          <circle cx="100" y="40" r="15" fill="#6c757d"/>
-          <text x="100" y="95" text-anchor="middle" dominant-baseline="middle" font-family="Arial" font-size="12" fill="#6c757d">Image Template</text>
-        </svg>
-      `)}`;
-    }
+    return `data:image/svg+xml;base64,${btoa(`
+      <svg width="300" height="200" viewBox="0 0 300 200" xmlns="http://www.w3.org/2000/svg">
+        <rect width="300" height="200" fill="#f8f9fa"/>
+        <rect x="75" y="75" width="150" height="75" fill="#e9ecef" stroke="#6c757d" stroke-width="1"/>
+        <text x="150" y="115" text-anchor="middle" dominant-baseline="middle" font-family="Arial" font-size="14" fill="#6c757d">
+          ${template.displayName || template.name}
+        </text>
+      </svg>
+    `)}`;
   };
 
   const getTemplateThumbnail = (template) => {
-    // Return generated thumbnail or fallback
     return thumbnails[template.name] || getFallbackThumbnail(template);
+  };
+
+  const getBestPreviewImage = (template) => {
+    if (template.jsonData?.projectImageUrl) {
+      return template.jsonData.projectImageUrl;
+    }
+    
+    if (template.jsonData?.pageImageUrl) {
+      return template.jsonData.pageImageUrl;
+    }
+    
+    return getTemplateThumbnail(template);
   };
 
   const getTemplateDisplayName = (template, index) => {
@@ -173,11 +189,32 @@ const TemplateTool = ({
   return (
     <div className="flex flex-col h-full">
       <div className="p-4 border-b">
-        <h2 className="text-lg font-semibold">Templates</h2>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <h2 className="text-lg font-semibold">Templates</h2>
+          
+          {/* Category Dropdown */}
+          <div className="flex items-center gap-2">
+            <label htmlFor="category-filter" className="text-sm text-gray-600 whitespace-nowrap">
+              Filter by:
+            </label>
+            <select
+              id="category-filter"
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              {categories.map((category) => (
+                <option key={category} value={category}>
+                  {category}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
 
         {/* Selected Template Info */}
         {selectedTemplate && (
-          <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded-lg">
             <div className="text-sm text-blue-800 flex items-center">
               <svg
                 className="w-4 h-4 mr-2"
@@ -210,12 +247,12 @@ const TemplateTool = ({
         className="flex-1 overflow-y-auto p-4"
         style={{
           maxHeight: "calc(100vh - 200px)",
-          WebkitOverflowScrolling: "touch", // Smooth scrolling on iOS
+          WebkitOverflowScrolling: "touch",
         }}
       >
-        {/* Template Grid with Vertical Scrolling */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {templates.map((template, index) => (
+        {/* Template Grid - Single column for larger previews */}
+        <div className="grid grid-cols-1 gap-4">
+          {filteredTemplates.map((template, index) => (
             <div
               key={template.name}
               className={`border-2 rounded-lg overflow-hidden cursor-pointer transition-all ${
@@ -225,42 +262,28 @@ const TemplateTool = ({
               }`}
               onClick={() => handleTemplateClick(template)}
             >
-              {/* Thumbnail */}
+              {/* Large Preview Image */}
               <div className="aspect-video bg-gray-50 flex items-center justify-center relative">
                 {thumbnailLoading[template.name] ? (
                   <div className="text-center text-gray-400">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto mb-2"></div>
-                    <div className="text-xs">Loading...</div>
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                    <div className="text-sm">Loading preview...</div>
                   </div>
                 ) : (
                   <>
                     <img
-                      src={getTemplateThumbnail(template)}
+                      src={getBestPreviewImage(template)}
                       alt={getTemplateDisplayName(template, index)}
                       className="w-full h-full object-contain"
                       onError={(e) => {
-                        // If image fails to load, use fallback
                         e.target.src = getFallbackThumbnail(template);
                       }}
                     />
 
-                    {/* Template Type Badge */}
-                    <div className="absolute top-2 right-2">
-                      <span
-                        className={`text-xs px-2 py-1 rounded-full ${
-                          template.type === "application/json"
-                            ? "bg-green-100 text-green-800"
-                            : "bg-blue-100 text-blue-800"
-                        }`}
-                      >
-                        {template.type === "application/json" ? "JSON" : "IMG"}
-                      </span>
-                    </div>
-
                     {/* Selection Indicator */}
                     {selectedTemplate === template.name && (
-                      <div className="absolute top-2 left-2">
-                        <div className="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center">
+                      <div className="absolute top-3 left-3">
+                        <div className="bg-blue-500 text-white rounded-full w-7 h-7 flex items-center justify-center shadow-lg">
                           <svg
                             className="w-4 h-4"
                             fill="none"
@@ -281,38 +304,26 @@ const TemplateTool = ({
                 )}
               </div>
 
-              {/* Template Info */}
-              <div className="p-3 border-t">
-                <div className="flex justify-between items-start mb-1">
-                  <h3 className="font-medium text-sm text-gray-900 truncate flex-1">
-                    {getTemplateDisplayName(template, index)}
-                  </h3>
-                </div>
-
-                {template.category && template.category !== "Other" && (
-                  <span className="inline-block bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded mb-2">
-                    {template.category}
-                  </span>
-                )}
-
-                <div className="flex justify-between items-center text-xs text-gray-500">
-                  <span>
-                    {template.type === "application/json"
-                      ? "JSON Template"
-                      : "Image Template"}
-                  </span>
-                  <span>{formatFileSize(template.size)}</span>
-                </div>
+              {/* Template Name Only */}
+              <div className="p-3 border-t bg-white">
+                <h3 className="font-medium text-gray-900 text-center">
+                  {getTemplateDisplayName(template, index)}
+                </h3>
               </div>
             </div>
           ))}
         </div>
 
         {/* Empty State */}
-        {templates.length === 0 && (
+        {filteredTemplates.length === 0 && (
           <div className="text-center text-gray-500 py-8 border-2 border-dashed border-gray-300 rounded-lg">
-            <div className="text-lg mb-2">No templates available</div>
-            <div className="text-sm">Upload templates to get started</div>
+            <div className="text-lg mb-2">No templates found</div>
+            <div className="text-sm">
+              {selectedCategory !== "All" 
+                ? `No templates in category "${selectedCategory}"`
+                : "Upload templates to get started"
+              }
+            </div>
           </div>
         )}
       </div>
@@ -330,9 +341,9 @@ const TemplateTool = ({
   );
 };
 
-// Helper function to format file size
+// Helper function to format file size (keeping for potential future use)
 const formatFileSize = (bytes) => {
-  if (bytes === 0) return "0 Bytes";
+  if (!bytes || bytes === 0) return "0 Bytes";
   const k = 1024;
   const sizes = ["Bytes", "KB", "MB", "GB"];
   const i = Math.floor(Math.log(bytes) / Math.log(k));

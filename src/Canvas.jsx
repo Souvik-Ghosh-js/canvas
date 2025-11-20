@@ -277,6 +277,21 @@ function App() {
     }
   };
 
+  // Function to upload canvas as image and get URL
+  const uploadCanvasImage = async (canvasInstance, fileName) => {
+    try {
+      const imageResult = await uploadCanvasToImagesBucket(canvasInstance, fileName);
+      if (imageResult.success) {
+        return imageResult.imageUrl;
+      } else {
+        throw new Error("Failed to upload image: " + imageResult.error);
+      }
+    } catch (error) {
+      console.error("Error uploading canvas image:", error);
+      throw error;
+    }
+  };
+
   // Open export modals
   const handleOpenProjectExport = () => {
     setExportProjectName(currentProject?.project_name || "My Design");
@@ -290,14 +305,21 @@ function App() {
     setIsPageExportModalOpen(true);
   };
 
-  // Export project as JSON file
-  // Export project as JSON file
-  const exportProjectAsJson = (projectName) => {
+  // Export project as JSON file with image URL
+  const exportProjectAsJson = async (projectName) => {
     try {
       // First save current page state
       const updatedCanvasList = canvasList.map((page) =>
         page.id === activePage ? { ...page, json: canvas.toJSON() } : page
       );
+
+      // Upload project preview image (use first page as preview)
+      let projectImageUrl = "";
+      try {
+        projectImageUrl = await uploadCanvasImage(canvas, `${projectName}_preview`);
+      } catch (error) {
+        console.warn("Could not upload project preview image:", error);
+      }
 
       const projectData = {
         project: projectName,
@@ -306,6 +328,7 @@ function App() {
         exportDate: new Date().toISOString(),
         version: "1.0",
         totalPages: updatedCanvasList.length,
+        projectImageUrl: projectImageUrl, // Add the image URL here
       };
 
       const dataStr = JSON.stringify(projectData, null, 2);
@@ -334,16 +357,26 @@ function App() {
     }
   };
 
-  // Export current canvas as JSON
-  const exportCurrentCanvasAsJson = (pageName) => {
+  // Export current canvas as JSON with image URL
+  const exportCurrentCanvasAsJson = async (pageName) => {
     try {
       const canvasJson = canvas.toJSON();
+      
+      // Upload page image
+      let pageImageUrl = "";
+      try {
+        pageImageUrl = await uploadCanvasImage(canvas, pageName);
+      } catch (error) {
+        console.warn("Could not upload page image:", error);
+      }
+
       const pageData = {
         pageName: pageName,
         pageNumber: activePage,
         canvasData: canvasJson,
         exportDate: new Date().toISOString(),
         version: "1.0",
+        pageImageUrl: pageImageUrl, // Add the image URL here
       };
 
       const dataStr = JSON.stringify(pageData, null, 2);
@@ -406,7 +439,6 @@ function App() {
     addImage(canvas, imageUrl);
   };
 
-  // Function to switch between pages
   // Function to switch between pages
   const switchPage = (pageId) => {
     if (!canvas || activePage === pageId) return;

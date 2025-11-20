@@ -36,7 +36,6 @@ export const getTemplatesFromBucket = async () => {
           };
 
           // For JSON templates, try to load and parse the data
-          // In getTemplatesFromBucket function, update the JSON parsing part:
           if (file.name.endsWith(".json")) {
             try {
               const response = await fetch(urlData.publicUrl);
@@ -44,8 +43,18 @@ export const getTemplatesFromBucket = async () => {
                 const jsonData = await response.json();
                 templateData.jsonData = jsonData;
 
-                // Extract preview image from all three structures
-                if (jsonData.backgroundImage) {
+                // Priority order for preview images:
+                // 1. projectImageUrl (for multi-page templates)
+                // 2. pageImageUrl (for single-page templates) 
+                // 3. Existing preview logic as fallback
+                
+                if (jsonData.projectImageUrl) {
+                  // Use projectImageUrl as highest priority (multi-page templates)
+                  templateData.previewUrl = jsonData.projectImageUrl;
+                } else if (jsonData.pageImageUrl) {
+                  // Use pageImageUrl for single-page templates
+                  templateData.previewUrl = jsonData.pageImageUrl;
+                } else if (jsonData.backgroundImage) {
                   // Standard Fabric.js structure
                   templateData.previewUrl = jsonData.backgroundImage;
                 } else if (jsonData.canvasData?.backgroundImage) {
@@ -53,8 +62,7 @@ export const getTemplatesFromBucket = async () => {
                   templateData.previewUrl = jsonData.canvasData.backgroundImage;
                 } else if (jsonData.pages?.[0]?.json?.backgroundImage) {
                   // Multi-page structure
-                  templateData.previewUrl =
-                    jsonData.pages[0].json.backgroundImage;
+                  templateData.previewUrl = jsonData.pages[0].json.backgroundImage;
                 }
               }
             } catch (e) {
@@ -254,13 +262,26 @@ const applyImageTemplateToCanvas = (canvas, imageUrl) => {
 // Helper function to create thumbnail for JSON templates
 export const createTemplateThumbnail = async (template) => {
   try {
+    // Priority order for preview images:
+    // 1. projectImageUrl from JSON (multi-page templates)
+    // 2. pageImageUrl from JSON (single-page templates)
+    // 3. existing previewUrl
+    // 4. Fallback: generate thumbnail for JSON templates
+    
+    if (template.jsonData?.projectImageUrl) {
+      return template.jsonData.projectImageUrl;
+    }
+    
+    if (template.jsonData?.pageImageUrl) {
+      return template.jsonData.pageImageUrl;
+    }
+    
     if (template.previewUrl) {
-      // For templates with preview images, use them directly
       return template.previewUrl;
     }
 
+    // Fallback: generate thumbnail for JSON templates
     if (template.type === "application/json" && template.jsonData) {
-      // Create a thumbnail canvas for JSON templates
       return await createJsonTemplateThumbnail(template.jsonData);
     }
 
