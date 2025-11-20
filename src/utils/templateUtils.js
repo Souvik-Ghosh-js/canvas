@@ -162,7 +162,7 @@ const applyJsonTemplateToCanvas = (canvas, jsonData) => {
       }
 
       // Reset zoom to 1 before applying template
-      canvas.setZoom(1);
+      canvas.setZoom(0.8);
       
       // Use design size (logical size) for template application
       const designWidth = 400; // Your base design width
