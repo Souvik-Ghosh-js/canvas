@@ -3,14 +3,11 @@ import RectProperties from "./RectProperties";
 import CircleProperties from "./CircleProperties";
 import TextProperties from "./TextProperties";
 import CanvasProperties from "./CanvasProperties";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import ImageProperties from "./ImageProperties";
 import { applyMask } from "../utils/imageMask";
 import { loadCustomFont } from "../utils/loadCustomFont";
 import {
-  ZoomIn,
-  ZoomOut,
-  Hand,
   RotateCw,
   FlipHorizontal,
   FlipVertical,
@@ -21,11 +18,6 @@ function Settings({ canvas, isSideBarOpen }) {
   const [canvasWidth, setCanvasWidth] = useState("");
   const [canvasHeight, setCanvasHeight] = useState("");
   const [canvasColor, setCanvasColor] = useState("");
-  const [zoomLevel, setZoomLevel] = useState(100);
-  const [isPanning, setIsPanning] = useState(false);
-  const panningRef = useRef(false);
-  const lastPosXRef = useRef(0);
-  const lastPosYRef = useRef(0);
 
   const {
     selectedObject,
@@ -58,123 +50,8 @@ function Settings({ canvas, isSideBarOpen }) {
       setCanvasHeight(canvas.getHeight());
       setCanvasWidth(canvas.getWidth());
       setCanvasColor(canvas.backgroundColor);
-
-      const currentZoom = canvas.getZoom() * 100;
-      setZoomLevel(Math.round(currentZoom));
-
-      setupCanvasPanning();
     }
-
-    return () => {
-      if (canvas) {
-        canvas.off("mouse:down");
-        canvas.off("mouse:move");
-        canvas.off("mouse:up");
-      }
-    };
   }, [canvas]);
-
-  const setupCanvasPanning = () => {
-    if (!canvas) return;
-
-    canvas.on("mouse:down", (options) => {
-      if (isPanning && options.e && canvas.getZoom() > 1) {
-        panningRef.current = true;
-        canvas.selection = false;
-        canvas.defaultCursor = "grabbing";
-        lastPosXRef.current = options.e.clientX;
-        lastPosYRef.current = options.e.clientY;
-      }
-    });
-
-    canvas.on("mouse:move", (options) => {
-      if (panningRef.current && options.e) {
-        const vpt = canvas.viewportTransform;
-        const deltaX = options.e.clientX - lastPosXRef.current;
-        const deltaY = options.e.clientY - lastPosYRef.current;
-
-        vpt[4] += deltaX;
-        vpt[5] += deltaY;
-
-        canvas.setViewportTransform(vpt);
-        canvas.requestRenderAll();
-
-        lastPosXRef.current = options.e.clientX;
-        lastPosYRef.current = options.e.clientY;
-      }
-    });
-
-    canvas.on("mouse:up", () => {
-      if (isPanning) {
-        panningRef.current = false;
-        canvas.defaultCursor = "grab";
-      }
-    });
-  };
-
-  const togglePanMode = () => {
-    const newPanningState = !isPanning;
-    setIsPanning(newPanningState);
-
-    if (canvas) {
-      canvas.selection = !newPanningState;
-      canvas.defaultCursor = newPanningState ? "grab" : "default";
-
-      if (!newPanningState) {
-        panningRef.current = false;
-      }
-    }
-  };
-
-  const handleZoomChange = (e) => {
-    const newZoom = parseInt(e.target.value);
-    setZoomLevel(newZoom);
-    applyZoom(newZoom);
-  };
-
-  const handleZoomIn = () => {
-    const newZoom = Math.min(zoomLevel + 10, 200);
-    setZoomLevel(newZoom);
-    applyZoom(newZoom);
-  };
-
-  const handleZoomOut = () => {
-    const newZoom = Math.max(zoomLevel - 10, 10);
-    setZoomLevel(newZoom);
-    applyZoom(newZoom);
-  };
-
-  const applyZoom = (zoom) => {
-    if (canvas) {
-      const zoomFactor = zoom / 100;
-      canvas.setZoom(zoomFactor);
-      centerViewport();
-      canvas.renderAll();
-    }
-  };
-
-  const centerViewport = () => {
-    if (canvas) {
-      const canvasWidth = canvas.getWidth();
-      const canvasHeight = canvas.getHeight();
-      const zoom = canvas.getZoom();
-
-      canvas.viewportTransform[4] = (canvasWidth - canvasWidth * zoom) / 2;
-      canvas.viewportTransform[5] = (canvasHeight - canvasHeight * zoom) / 2;
-      canvas.setViewportTransform(canvas.viewportTransform);
-    }
-  };
-
-  const resetZoom = () => {
-    setZoomLevel(100);
-    applyZoom(100);
-    setIsPanning(false);
-
-    if (canvas) {
-      canvas.selection = true;
-      canvas.defaultCursor = "default";
-    }
-  };
 
   const handleCanvasColorChange = (e) => {
     const value = e.target.value;
@@ -333,103 +210,6 @@ function Settings({ canvas, isSideBarOpen }) {
                 : "Canvas Settings"}
             </p>
           </div>
-        </div>
-      </section>
-
-      {/* Zoom & Navigation Section */}
-      <section className="px-6 py-4 border-b border-gray-200/50 bg-white/50 rounded-lg mx-4 my-3">
-        <div className="flex items-center justify-between mb-4">
-          <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-            <div className="w-2 h-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full"></div>
-            View Controls
-          </label>
-          <button
-            onClick={resetZoom}
-            className="text-xs bg-gradient-to-r from-gray-100 to-gray-200 hover:from-gray-200 hover:to-gray-300 text-gray-700 px-3 py-1 rounded-full font-medium transition-all shadow-sm"
-          >
-            Reset
-          </button>
-        </div>
-
-        {/* Zoom Controls */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-gray-600">
-              Zoom Level
-            </span>
-            <span className="text-sm font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              {zoomLevel}%
-            </span>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              onClick={handleZoomOut}
-              disabled={zoomLevel <= 10}
-              className="p-2 rounded-xl bg-gradient-to-r from-gray-100 to-gray-200 hover:from-gray-200 hover:to-gray-300 disabled:from-gray-50 disabled:to-gray-100 disabled:opacity-50 transition-all shadow-sm"
-              title="Zoom Out"
-            >
-              <ZoomOut size={18} className="text-gray-600" />
-            </button>
-
-            <div className="flex-1">
-              <input
-                type="range"
-                min="10"
-                max="200"
-                value={zoomLevel}
-                onChange={handleZoomChange}
-                className="w-full h-2 bg-gradient-to-r from-blue-200 to-purple-200 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-gradient-to-r [&::-webkit-slider-thumb]:from-blue-500 [&::-webkit-slider-thumb]:to-purple-500 [&::-webkit-slider-thumb]:shadow-lg"
-              />
-            </div>
-
-            <button
-              onClick={handleZoomIn}
-              disabled={zoomLevel >= 200}
-              className="p-2 rounded-xl bg-gradient-to-r from-gray-100 to-gray-200 hover:from-gray-200 hover:to-gray-300 disabled:from-gray-50 disabled:to-gray-100 disabled:opacity-50 transition-all shadow-sm"
-              title="Zoom In"
-            >
-              <ZoomIn size={18} className="text-gray-600" />
-            </button>
-          </div>
-
-          <div className="flex justify-between text-xs text-gray-500 px-1">
-            <span>10%</span>
-            <span>100%</span>
-            <span>200%</span>
-          </div>
-        </div>
-
-        {/* Pan Mode Toggle */}
-        <div className="mt-4 p-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl border border-blue-100">
-          <div className="flex items-center justify-between">
-            <div>
-              <span className="text-sm font-semibold text-gray-700 block">
-                Pan Mode
-              </span>
-              <span className="text-xs text-gray-500">
-                Click and drag to navigate
-              </span>
-            </div>
-            <button
-              onClick={togglePanMode}
-              className={`p-3 rounded-xl transition-all duration-300 shadow-sm ${
-                isPanning
-                  ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-md"
-                  : "bg-white text-gray-600 hover:bg-gray-50 border border-gray-200"
-              }`}
-              title={isPanning ? "Disable panning" : "Enable panning"}
-            >
-              <Hand size={18} />
-            </button>
-          </div>
-
-          {isPanning && (
-            <div className="mt-2 p-2 bg-yellow-100 border border-yellow-200 rounded-lg text-xs text-yellow-700 flex items-center gap-2">
-              <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
-              Pan mode active - Click and drag to move canvas
-            </div>
-          )}
         </div>
       </section>
 
