@@ -1059,7 +1059,7 @@ const switchPage = (pageId) => {
             className="hover:opacity-80 transition-opacity"
           >
             <img 
-              src="https://dtpszuxlofjlvbqqxsep.supabase.co/storage/v1/object/public/gobtlogo/ChatGPT%20Image%20Nov%2021,%202025,%2010_38_20%20PM.png" 
+              src="https://dtpszuxlofjlvbqqxsep.supabase.co/storage/v1/object/public/gobtlogo/WhatsApp_Image_2025-11-21_at_10.43.40_PM-removebg-preview.png" 
               alt="GOBT.in" 
               className="h-12 object-contain"
               onError={(e) => {
