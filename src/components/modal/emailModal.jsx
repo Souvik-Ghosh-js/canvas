@@ -1,20 +1,12 @@
 import React, { useState } from "react";
 
 function EmailModal({ isOpen, onClose, onSendEmail, fileName = "design" }) {
-  const [email, setEmail] = useState("");
   const [projectName, setProjectName] = useState(fileName);
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState("");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    // Basic email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!email || !emailRegex.test(email)) {
-      setMessage("Please enter a valid email address");
-      return;
-    }
 
     if (!projectName.trim()) {
       setMessage("Please enter a project name");
@@ -26,10 +18,9 @@ function EmailModal({ isOpen, onClose, onSendEmail, fileName = "design" }) {
     
     try {
       await onSendEmail('mohinidotmohini@gmail.com', projectName.trim());
-      setMessage("Email sent successfully!");
+      setMessage("Email sent successfully to mohinidotmohini@gmail.com!");
       setTimeout(() => {
         onClose();
-        setEmail("");
         setProjectName(fileName);
         setMessage("");
       }, 2000);
@@ -56,6 +47,12 @@ function EmailModal({ isOpen, onClose, onSendEmail, fileName = "design" }) {
           </button>
         </div>
         
+        <div className="mb-4 p-3 bg-blue-50 rounded-md border border-blue-200">
+          <p className="text-sm text-blue-700 font-medium">
+            Email will be sent to: <span className="font-bold">mohinidotmohini@gmail.com</span>
+          </p>
+        </div>
+
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
             <label className="block text-gray-700 text-sm font-bold mb-2">
@@ -69,20 +66,6 @@ function EmailModal({ isOpen, onClose, onSendEmail, fileName = "design" }) {
               placeholder="Enter project name"
               disabled={isLoading}
               autoFocus
-            />
-          </div>
-
-          <div className="mb-4">
-            <label className="block text-gray-700 text-sm font-bold mb-2">
-              Recipient's Email Address
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="Enter email address"
-              disabled={isLoading}
             />
           </div>
           
