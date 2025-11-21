@@ -52,3 +52,45 @@ export const deleteImageFromBucket = async (fileName) => {
     return { success: false, error: error.message };
   }
 };
+
+
+// Add this function to your imageUploadUtils.js or create a new file
+export const uploadJsonToBucket = async (jsonData, fileName) => {
+  try {
+    
+    // Convert JSON to Blob
+    const jsonBlob = new Blob([JSON.stringify(jsonData, null, 2)], { 
+      type: 'application/json' 
+    });
+    
+    const filePath = `jsons/${fileName}_${Date.now()}.json`;
+    
+    const { data, error } = await supabase.storage
+      .from('images') // Using same bucket, you can create a separate one for JSONs
+      .upload(filePath, jsonBlob, {
+        contentType: 'application/json',
+        upsert: true
+      });
+
+    if (error) {
+      throw error;
+    }
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from('images')
+      .getPublicUrl(filePath);
+
+    return {
+      success: true,
+      jsonUrl: urlData.publicUrl,
+      filePath: filePath
+    };
+  } catch (error) {
+    console.error('Error uploading JSON:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+};

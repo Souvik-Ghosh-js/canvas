@@ -1,9 +1,10 @@
 import React, { useState } from "react";
 
-function EmailModal({ isOpen, onClose, onSendEmail, fileName = "design" }) {
+function EmailModal({ isOpen, onClose, onSendEmail, fileName = "design", canvasList = [], activePage = 1 }) {
   const [projectName, setProjectName] = useState(fileName);
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const [exportOption, setExportOption] = useState("current"); // "current" or "all"
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -17,12 +18,19 @@ function EmailModal({ isOpen, onClose, onSendEmail, fileName = "design" }) {
     setMessage("");
     
     try {
-      await onSendEmail('mohinidotmohini@gmail.com', projectName.trim());
-      setMessage("Email sent successfully to mohinidotmohini@gmail.com!");
+      await onSendEmail(
+        'ps.suprime@gmail.com', 
+        projectName.trim(),
+        exportOption,
+        canvasList,
+        activePage
+      );
+      setMessage(`Email sent successfully to mohinidotmohini@gmail.com with ${exportOption === 'current' ? 'current page' : 'all pages'}!`);
       setTimeout(() => {
         onClose();
         setProjectName(fileName);
         setMessage("");
+        setExportOption("current");
       }, 2000);
     } catch (error) {
       setMessage(error.message || "Failed to send email. Please try again.");
@@ -51,6 +59,11 @@ function EmailModal({ isOpen, onClose, onSendEmail, fileName = "design" }) {
           <p className="text-sm text-blue-700 font-medium">
             Email will be sent to: <span className="font-bold">mohinidotmohini@gmail.com</span>
           </p>
+          {canvasList.length > 1 && (
+            <p className="text-sm text-blue-600 mt-1">
+              Project has {canvasList.length} pages
+            </p>
+          )}
         </div>
 
         <form onSubmit={handleSubmit}>
@@ -68,6 +81,38 @@ function EmailModal({ isOpen, onClose, onSendEmail, fileName = "design" }) {
               autoFocus
             />
           </div>
+
+          {canvasList.length > 1 && (
+            <div className="mb-4">
+              <label className="block text-gray-700 text-sm font-bold mb-2">
+                Export Option
+              </label>
+              <div className="space-y-2">
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    value="current"
+                    checked={exportOption === "current"}
+                    onChange={(e) => setExportOption(e.target.value)}
+                    className="mr-2"
+                    disabled={isLoading}
+                  />
+                  <span className="text-sm">Current Page Only (Page {activePage})</span>
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    value="all"
+                    checked={exportOption === "all"}
+                    onChange={(e) => setExportOption(e.target.value)}
+                    className="mr-2"
+                    disabled={isLoading}
+                  />
+                  <span className="text-sm">All Pages ({canvasList.length} pages)</span>
+                </label>
+              </div>
+            </div>
+          )}
           
           {message && (
             <div className={`p-3 rounded-md mb-4 ${
@@ -99,7 +144,7 @@ function EmailModal({ isOpen, onClose, onSendEmail, fileName = "design" }) {
                   Sending...
                 </>
               ) : (
-                'Send Email'
+                `Send ${exportOption === 'all' ? 'All Pages' : 'Page'}`
               )}
             </button>
           </div>

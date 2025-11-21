@@ -51,7 +51,7 @@ import {
   duplicateCurrentPage,
   loadPageToCanvas,
 } from "./utils/pageUtils";
-import { uploadCanvasToImagesBucket } from "./utils/imageUploadUtils";
+import { uploadCanvasToImagesBucket , uploadJsonToBucket } from "./utils/imageUploadUtils";
 
 import {
   exportAsPNG,
@@ -247,20 +247,140 @@ const handleProjectSelect = (projectData) => {
     }
   };
 
-  const handleSendEmail = async (email, projectName) => {
-    try {
-      const imageResult = await uploadCanvasToImagesBucket(canvas, projectName);
+const handleSendEmail = async (email, projectName, exportOption, canvasList, activePage) => {
+  let originalCanvasState = null;
+  
+  try {
+    const imageUrls = [];
+    const jsonUrls = [];
+    const pageNames = [];
+
+    // Save the current canvas state
+    originalCanvasState = canvas.toJSON();
+
+    if (exportOption === 'current' || canvasList.length === 1) {
+      // Single page export - use current canvas
+      console.log('Exporting single page:', activePage);
+      
+      const imageResult = await uploadCanvasToImagesBucket(
+        canvas, 
+        `${projectName.replace(/\s+/g, '_')}_page_${activePage}`
+      );
+      
+      const jsonResult = await uploadJsonToBucket(
+        canvas.toJSON(), 
+        `${projectName.replace(/\s+/g, '_')}_page_${activePage}_json`
+      );
 
       if (!imageResult.success) {
-        throw new Error("Failed to upload image: " + imageResult.error);
+        throw new Error('Failed to upload image: ' + imageResult.error);
+      }
+      if (!jsonResult.success) {
+        throw new Error('Failed to upload JSON: ' + jsonResult.error);
       }
 
-      console.log("Image uploaded to:", imageResult.imageUrl);
-      await sendEmail(email, projectName, imageResult.imageUrl, projectName);
-    } catch (error) {
-      throw new Error("Failed to send email: " + error.message);
+      imageUrls.push(imageResult.imageUrl);
+      jsonUrls.push(jsonResult.jsonUrl);
+      pageNames.push(`${projectName} - Page ${activePage}`);
+      
+    } else {
+      // Multiple pages export
+      console.log('Exporting all pages:', canvasList.length);
+      
+      for (let i = 0; i < canvasList.length; i++) {
+        const page = canvasList[i];
+        console.log(`Processing page ${i + 1}/${canvasList.length}`, page);
+        
+        // Clear the canvas completely
+        canvas.clear();
+        
+        if (page.json && page.json.objects && page.json.objects.length > 0) {
+          console.log(`Loading page ${i + 1} JSON data`);
+          
+          // Load the page data onto canvas
+          await new Promise((resolve, reject) => {
+            try {
+              canvas.loadFromJSON(page.json, () => {
+                canvas.renderAll();
+                console.log(`Page ${i + 1} loaded successfully`);
+                resolve();
+              });
+            } catch (loadError) {
+              console.error(`Error loading page ${i + 1}:`, loadError);
+              reject(loadError);
+            }
+          });
+        } else {
+          console.log(`Page ${i + 1} is empty, setting default background`);
+          // Set default background for empty pages
+          canvas.setBackgroundColor('#ffffff', () => {
+            canvas.renderAll();
+          });
+        }
+
+        // Wait for rendering to complete
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        console.log(`Capturing image for page ${i + 1}`);
+        const imageResult = await uploadCanvasToImagesBucket(
+          canvas, 
+          `${projectName.replace(/\s+/g, '_')}_page_${i + 1}`
+        );
+        
+        console.log(`Uploading JSON for page ${i + 1}`);
+        const jsonResult = await uploadJsonToBucket(
+          page.json || canvas.toJSON(), 
+          `${projectName.replace(/\s+/g, '_')}_page_${i + 1}_json`
+        );
+
+        if (!imageResult.success) {
+          throw new Error(`Failed to upload page ${i + 1} image: ` + imageResult.error);
+        }
+        if (!jsonResult.success) {
+          throw new Error(`Failed to upload page ${i + 1} JSON: ` + jsonResult.error);
+        }
+
+        imageUrls.push(imageResult.imageUrl);
+        jsonUrls.push(jsonResult.jsonUrl);
+        pageNames.push(`${projectName} - Page ${i + 1}`);
+        
+        console.log(`Page ${i + 1} processed successfully - Image: ${imageResult.imageUrl}`);
+      }
     }
-  };
+
+    console.log('All files uploaded successfully:', {
+      images: imageUrls.length,
+      jsons: jsonUrls.length,
+      imageUrls: imageUrls,
+      jsonUrls: jsonUrls
+    });
+    
+    await sendEmail(email, projectName, imageUrls, jsonUrls, pageNames);
+    console.log('Email sent successfully');
+    
+  } catch (error) {
+    console.error('Error in handleSendEmail:', error);
+    throw new Error('Failed to send email: ' + error.message);
+  } finally {
+    // Always restore the original canvas state
+    if (originalCanvasState) {
+      try {
+        console.log('Restoring original canvas state');
+        canvas.clear();
+        await new Promise((resolve) => {
+          canvas.loadFromJSON(originalCanvasState, () => {
+            canvas.renderAll();
+            console.log('Canvas state restored successfully');
+            resolve();
+          });
+        });
+      } catch (restoreError) {
+        console.error('Failed to restore canvas state:', restoreError);
+      }
+    }
+  }
+};
+
 
   // Updated template handler function
   const handleTemplateSelect = async (template) => {
@@ -672,12 +792,14 @@ const handleProjectSelect = (projectData) => {
         canvas={canvas}
       />
 
-      <EmailModal
-        isOpen={isEmailModalOpen}
-        onClose={() => setIsEmailModalOpen(false)}
-        onSendEmail={handleSendEmail}
-        fileName="my_design"
-      />
+<EmailModal
+  isOpen={isEmailModalOpen}
+  onClose={() => setIsEmailModalOpen(false)}
+  onSendEmail={handleSendEmail}
+  fileName={currentProject?.project_name || "My Design"}
+  canvasList={canvasList}
+  activePage={activePage}
+/>
 
       {/* Page Management Section */}
       <section className="bg-white/80 backdrop-blur-sm border-b border-gray-200/50 px-3 py-2">
