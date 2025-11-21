@@ -1064,7 +1064,7 @@ function App() {
             className="hover:opacity-80 transition-opacity"
           >
             <img 
-              src="/gobt.png" 
+              src="https://dtpszuxlofjlvbqqxsep.supabase.co/storage/v1/object/public/gobtlogo/ChatGPT%20Image%20Nov%2021,%202025,%2010_38_20%20PM.png" 
               alt="GOBT.in" 
               className="h-12 object-contain"
               onError={(e) => {

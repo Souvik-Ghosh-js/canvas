@@ -27,7 +27,7 @@ function Header({ onExport, onOpen, onSave, onExportJSON, onExportCurrentJSON, o
         </section>
        <div className="flex items-center">
   <img 
-    src="/logo.png" 
+    src="https://dtpszuxlofjlvbqqxsep.supabase.co/storage/v1/object/public/gobtlogo/ChatGPT%20Image%20Nov%2021,%202025,%2010_38_20%20PM.png" 
     alt="Company Logo" 
     className="h-17 object-contain p-0"
     onError={(e) => {
