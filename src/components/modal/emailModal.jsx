@@ -19,7 +19,7 @@ function EmailModal({ isOpen, onClose, onSendEmail, fileName = "design", canvasL
     
     try {
       await onSendEmail(
-        'ps.suprime@gmail.com', 
+        'mohinidotmohini@gmail.com', 
         projectName.trim(),
         exportOption,
         canvasList,
