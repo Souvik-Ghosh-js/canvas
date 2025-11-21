@@ -128,44 +128,54 @@ function App() {
     setIsProjectsModalOpen(true);
   };
 
-  const handleProjectSelect = (projectData) => {
-    if (projectData.pages && Array.isArray(projectData.pages)) {
-      // Load the complete project with all pages
-      setCanvasList(projectData.pages);
+const handleProjectSelect = (projectData) => {
+  if (projectData.pages && Array.isArray(projectData.pages)) {
+    // Load the complete project with all pages
+    setCanvasList(projectData.pages);
 
-      // Set the active page
-      const targetPage = projectData.activePage || 1;
-      setActivePage(targetPage);
+    // Set the active page
+    const targetPage = projectData.activePage || 1;
+    setActivePage(targetPage);
 
-      // Load the active page to canvas
-      const activePageData = projectData.pages.find(
-        (page) => page.id === targetPage
-      );
-      if (activePageData?.json) {
-        canvas.loadFromJSON(activePageData.json, () => {
-          canvas.renderAll();
-        });
-      } else {
-        canvas.clear();
-        canvas.setBackgroundColor("#ffffff", () => {
-          canvas.requestRenderAll();
-        });
-      }
-
-      setCurrentProject(projectData);
-    } else {
-      // Fallback for old project format (single page)
-      canvas.clear();
-      canvas.loadFromJSON(projectData, () => {
+    // Load the active page to canvas
+    const activePageData = projectData.pages.find(
+      (page) => page.id === targetPage
+    );
+    
+    if (activePageData?.json) {
+      canvas.loadFromJSON(activePageData.json, () => {
         canvas.renderAll();
+        // Force additional re-renders
+        canvas.requestRenderAll();
+        setTimeout(() => {
+          canvas.requestRenderAll();
+        }, 100);
       });
-      setCurrentProject(projectData);
-      // Reset to single page
-      setCanvasList([{ id: 1, json: projectData }]);
-      setActivePage(1);
+    } else {
+      canvas.clear();
+      canvas.setBackgroundColor("#ffffff", () => {
+        canvas.requestRenderAll();
+      });
     }
-  };
 
+    setCurrentProject(projectData);
+  } else {
+    // Fallback for old project format (single page)
+    canvas.clear();
+    canvas.loadFromJSON(projectData, () => {
+      canvas.renderAll();
+      // Force additional re-renders
+      canvas.requestRenderAll();
+      setTimeout(() => {
+        canvas.requestRenderAll();
+      }, 100);
+    });
+    setCurrentProject(projectData);
+    // Reset to single page
+    setCanvasList([{ id: 1, json: projectData }]);
+    setActivePage(1);
+  }
+};
   const handleSave = async (projectName = null, isUpdate = false) => {
     try {
       const macId = getMacId();
