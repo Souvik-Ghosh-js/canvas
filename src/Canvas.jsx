@@ -1017,7 +1017,7 @@ function App() {
 
           {/* Floating Object Controls */}
           {showDelete && (
-            <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 flex items-center gap-3 bg-white/95 backdrop-blur-sm px-4 py-3 rounded-2xl shadow-2xl border border-gray-200/50 z-40">
+            <div className="fixed bottom-16 left-1/2 transform -translate-x-1/2 flex items-center gap-3 bg-white/95 backdrop-blur-sm px-4 py-3 rounded-2xl shadow-2xl border border-gray-200/50 z-40">
               <button
                 className="p-2 text-red-500 cursor-pointer hover:bg-red-50 rounded-xl transition-all duration-200 hover:scale-110"
                 onClick={handleDeleteObject}
@@ -1051,6 +1051,35 @@ function App() {
           onClose={() => setSideBarOpen(false)}
         />
       </main>
+
+      {/* Footer */}
+      <footer className="bg-white/80 backdrop-blur-sm border-t border-gray-200/50 px-4 py-2 h-12 flex items-center justify-between">
+        {/* Left side - Development Partner */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-600 font-medium">Development Partner</span>
+          <a 
+            href="https://gobt.in/" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="hover:opacity-80 transition-opacity"
+          >
+            <img 
+              src="/gobt.png" 
+              alt="GOBT.in" 
+              className="h-12 object-contain"
+              onError={(e) => {
+                e.target.style.display = 'none';
+                e.target.nextSibling.style.display = 'block';
+              }}
+            />
+            {/* Fallback text if logo fails to load */}
+            <span className="text-xs text-blue-600 font-semibold hidden">GOBT.in</span>
+          </a>
+        </div>
+
+        {/* Right side - Logo */}
+       
+      </footer>
     </div>
   );
 }

@@ -6,7 +6,7 @@ function Header({ onExport, onOpen, onSave, onExportJSON, onExportCurrentJSON, o
   const navigate = useNavigate();
   
   return (
-    <header className="flex items-center bg-white border-b border-gray-200 py-2 px-3 sm:px-4 shadow-sm">
+    <header className="flex items-center bg-white border-b border-gray-200 py--3 px-4 sm:px-4 shadow-sm">
       <section className="flex justify-between w-full items-center">
         {/* Left Section - File Operations */}
         <section className="flex gap-1 sm:gap-1.5">
@@ -25,7 +25,19 @@ function Header({ onExport, onOpen, onSave, onExportJSON, onExportCurrentJSON, o
             <Save size={18} className="sm:w-5 sm:h-5" />
           </button>
         </section>
-
+       <div className="flex items-center">
+  <img 
+    src="/logo.png" 
+    alt="Company Logo" 
+    className="h-17 object-contain p-0"
+    onError={(e) => {
+      e.target.style.display = 'none';
+      e.target.nextSibling.style.display = 'block';
+    }}
+  />
+  {/* Fallback text if logo fails to load */}
+  <span className="text-sm text-gray-700 font-semibold hidden">Logo</span>
+</div>
         {/* Right Section - Actions */}
         <section className="flex items-center gap-1 sm:gap-1.5">
           {/* Admin Dropdown */}
