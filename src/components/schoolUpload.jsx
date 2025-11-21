@@ -199,6 +199,26 @@ const SchoolUpload = () => {
     }
   };
 
+    const deleteSchoolImage = async (fileName) => {
+    if (!window.confirm('Are you sure you want to delete this school image?')) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase.storage
+        .from('schools')
+        .remove([fileName]);
+
+      if (error) throw error;
+
+      setSchools(prev => prev.filter(school => school.name !== fileName));
+      alert('School image deleted successfully!');
+    } catch (error) {
+      console.error('Error deleting school image:', error);
+      alert('Failed to delete school image');
+    }
+  };
+
   const removeSelectedFile = (fileName) => {
     setSelectedFiles(prev => prev.filter(file => file.name !== fileName));
     setSchoolNames(prev => {
