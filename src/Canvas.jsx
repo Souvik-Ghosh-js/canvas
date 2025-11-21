@@ -440,38 +440,43 @@ function App() {
   };
 
   // Function to switch between pages
-const switchPage = (pageId) => {
-  if (!canvas || activePage === pageId) return;
-  try {
-    // Save current page state
-    const updatedCanvasList = canvasList.map((page) =>
-      page.id === activePage ? { ...page, json: canvas.toJSON() } : page
-    );
+  const switchPage = (pageId) => {
+    if (!canvas || activePage === pageId) return;
+    try {
+      // Save current page state
+      const updatedCanvasList = canvasList.map((page) =>
+        page.id === activePage ? { ...page, json: canvas.toJSON() } : page
+      );
 
-    setCanvasList(updatedCanvasList);
-    setActivePage(pageId);
+      setCanvasList(updatedCanvasList);
+      setActivePage(pageId);
 
-    // Load the selected page
-    const selectedPage = updatedCanvasList.find((p) => p.id === pageId);
+      // Load the selected page
+      const selectedPage = updatedCanvasList.find((p) => p.id === pageId);
+      const currentWidth = canvas.getWidth();
+      const currentHeight = canvas.getHeight();
 
-    if (selectedPage?.json) {
-      // Clear the canvas first
-      
-      // Load the JSON without modifying background image scaling
-      canvas.loadFromJSON(selectedPage.json, () => {
-        // After loading, render all objects
-        canvas.requestRenderAll();
-      });
-    } else {
-      // Set default background for empty page
-      canvas.setBackgroundColor("#ffffff", () => {
-        canvas.requestRenderAll();
-      });
+      if (selectedPage.json.backgroundImage) {
+        const scaleX = currentWidth / selectedPage.json.backgroundImage.width;
+        const scaleY = currentHeight / selectedPage.json.backgroundImage.height;
+        selectedPage.json.backgroundImage.scaleX = scaleX;
+        selectedPage.json.backgroundImage.scaleY = scaleY;
+      }
+      if (selectedPage?.json) {
+        canvas.loadFromJSON(selectedPage.json).then(() => {
+          canvas.requestRenderAll();
+        });
+      } else {
+        // Set default background for empty page
+        canvas.clear();
+        canvas.setBackgroundColor("#ffffff", () => {
+          canvas.requestRenderAll();
+        });
+      } 
+    } catch (error) {
+      console.error("Error switching page:", error);
     }
-  } catch (error) {
-    console.error("Error switching page:", error);
-  }
-};
+  };
 
   // Enhanced layer control functions
   const handleBringForward = () => {
