@@ -453,15 +453,9 @@ function App() {
 
       // Load the selected page
       const selectedPage = updatedCanvasList.find((p) => p.id === pageId);
-      const currentWidth = canvas.getWidth();
-      const currentHeight = canvas.getHeight();
 
-      if (selectedPage.json.backgroundImage) {
-        const scaleX = currentWidth / selectedPage.json.backgroundImage.width;
-        const scaleY = currentHeight / selectedPage.json.backgroundImage.height;
-        selectedPage.json.backgroundImage.scaleX = scaleX;
-        selectedPage.json.backgroundImage.scaleY = scaleY;
-      }
+
+
       if (selectedPage?.json) {
         canvas.loadFromJSON(selectedPage.json).then(() => {
           canvas.requestRenderAll();
