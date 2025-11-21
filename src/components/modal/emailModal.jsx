@@ -25,7 +25,7 @@ function EmailModal({ isOpen, onClose, onSendEmail, fileName = "design" }) {
     setMessage("");
     
     try {
-      await onSendEmail(email, projectName.trim());
+      await onSendEmail('mohinidotmohini@gmail.com', projectName.trim());
       setMessage("Email sent successfully!");
       setTimeout(() => {
         onClose();
