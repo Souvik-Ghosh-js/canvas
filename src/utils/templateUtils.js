@@ -171,7 +171,15 @@ const applyJsonTemplateToCanvas = (canvas, jsonData) => {
       canvas.setHeight(designHeight);
       canvas.clear();
 
+      // Add template flag to canvas data before loading
+      templateData.isTemplate = true;
+      templateData.templateLoadedAt = new Date().toISOString();
+
       canvas.loadFromJSON(templateData, () => {
+        // Mark canvas as having templates
+        canvas.hasTemplates = true;
+        canvas.templateData = jsonData; // Store original template data
+        
         canvas.setZoom(zoom);
         canvas.setWidth(designWidth * zoom);
         canvas.setHeight(designHeight * zoom);

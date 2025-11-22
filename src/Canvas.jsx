@@ -51,7 +51,7 @@ import {
   duplicateCurrentPage,
   loadPageToCanvas,
 } from "./utils/pageUtils";
-import { uploadCanvasToImagesBucket , uploadJsonToBucket } from "./utils/imageUploadUtils";
+import { uploadCanvasToImagesBucket, uploadJsonToBucket } from "./utils/imageUploadUtils";
 
 import {
   exportAsPNG,
@@ -128,22 +128,41 @@ function App() {
     setIsProjectsModalOpen(true);
   };
 
-const handleProjectSelect = (projectData) => {
-  if (projectData.pages && Array.isArray(projectData.pages)) {
-    // Load the complete project with all pages
-    setCanvasList(projectData.pages);
+  const handleProjectSelect = (projectData) => {
+    if (projectData.pages && Array.isArray(projectData.pages)) {
+      // Load the complete project with all pages
+      setCanvasList(projectData.pages);
 
-    // Set the active page
-    const targetPage = projectData.activePage || 1;
-    setActivePage(targetPage);
+      // Set the active page
+      const targetPage = projectData.activePage || 1;
+      setActivePage(targetPage);
 
-    // Load the active page to canvas
-    const activePageData = projectData.pages.find(
-      (page) => page.id === targetPage
-    );
-    
-    if (activePageData?.json) {
-      canvas.loadFromJSON(activePageData.json, () => {
+      // Load the active page to canvas
+      const activePageData = projectData.pages.find(
+        (page) => page.id === targetPage
+      );
+
+      if (activePageData?.json) {
+        canvas.loadFromJSON(activePageData.json, () => {
+          canvas.renderAll();
+          // Force additional re-renders
+          canvas.requestRenderAll();
+          setTimeout(() => {
+            canvas.requestRenderAll();
+          }, 100);
+        });
+      } else {
+        canvas.clear();
+        canvas.setBackgroundColor("#ffffff", () => {
+          canvas.requestRenderAll();
+        });
+      }
+
+      setCurrentProject(projectData);
+    } else {
+      // Fallback for old project format (single page)
+      canvas.clear();
+      canvas.loadFromJSON(projectData, () => {
         canvas.renderAll();
         // Force additional re-renders
         canvas.requestRenderAll();
@@ -151,31 +170,12 @@ const handleProjectSelect = (projectData) => {
           canvas.requestRenderAll();
         }, 100);
       });
-    } else {
-      canvas.clear();
-      canvas.setBackgroundColor("#ffffff", () => {
-        canvas.requestRenderAll();
-      });
+      setCurrentProject(projectData);
+      // Reset to single page
+      setCanvasList([{ id: 1, json: projectData }]);
+      setActivePage(1);
     }
-
-    setCurrentProject(projectData);
-  } else {
-    // Fallback for old project format (single page)
-    canvas.clear();
-    canvas.loadFromJSON(projectData, () => {
-      canvas.renderAll();
-      // Force additional re-renders
-      canvas.requestRenderAll();
-      setTimeout(() => {
-        canvas.requestRenderAll();
-      }, 100);
-    });
-    setCurrentProject(projectData);
-    // Reset to single page
-    setCanvasList([{ id: 1, json: projectData }]);
-    setActivePage(1);
-  }
-};
+  };
   const handleSave = async (projectName = null, isUpdate = false) => {
     try {
       const macId = getMacId();
@@ -247,143 +247,154 @@ const handleProjectSelect = (projectData) => {
     }
   };
 
-const handleSendEmail = async (email, projectName, exportOption, canvasList, activePage) => {
-  let originalCanvasState = null;
-  
-  try {
-    const imageUrls = [];
-    const jsonUrls = [];
-    const pageNames = [];
+  const handleSendEmail = async (email, projectName, exportOption, canvasList, activePage) => {
+    let originalCanvasState = null;
 
-    // Save the current canvas state
-    originalCanvasState = canvas.toJSON();
+    try {
+      const imageUrls = [];
+      const jsonUrls = [];
+      const pageNames = [];
 
-    if (exportOption === 'current' || canvasList.length === 1) {
-      // Single page export - use current canvas
-      console.log('Exporting single page:', activePage);
-      
-      const imageResult = await uploadCanvasToImagesBucket(
-        canvas, 
-        `${projectName.replace(/\s+/g, '_')}_page_${activePage}`
-      );
-      
-      const jsonResult = await uploadJsonToBucket(
-        canvas.toJSON(), 
-        `${projectName.replace(/\s+/g, '_')}_page_${activePage}_json`
-      );
+      // Save the current canvas state
+      originalCanvasState = canvas.toJSON();
 
-      if (!imageResult.success) {
-        throw new Error('Failed to upload image: ' + imageResult.error);
-      }
-      if (!jsonResult.success) {
-        throw new Error('Failed to upload JSON: ' + jsonResult.error);
-      }
+      if (exportOption === 'current' || canvasList.length === 1) {
+        // Single page export - use current canvas
+        console.log('Exporting single page:', activePage);
 
-      imageUrls.push(imageResult.imageUrl);
-      jsonUrls.push(jsonResult.jsonUrl);
-      pageNames.push(`${projectName} - Page ${activePage}`);
-      
-    } else {
-      // Multiple pages export
-      console.log('Exporting all pages:', canvasList.length);
-      
-      for (let i = 0; i < canvasList.length; i++) {
-        const page = canvasList[i];
-        console.log(`Processing page ${i + 1}/${canvasList.length}`, page);
-        
-        
-        if (page.json && page.json.objects && page.json.objects.length > 0) {
-          console.log(`Loading page ${i + 1} JSON data`);
-          
-          // Load the page data onto canvas
-          await new Promise((resolve, reject) => {
-            try {
-              canvas.loadFromJSON(page.json, () => {
-                canvas.renderAll();
-                console.log(`Page ${i + 1} loaded successfully`);
-                resolve();
-              });
-            } catch (loadError) {
-              console.error(`Error loading page ${i + 1}:`, loadError);
-              reject(loadError);
-            }
-          });
-        } else {
-          console.log(`Page ${i + 1} is empty, setting default background`);
-          // Set default background for empty pages
-        }
-
-        // Wait for rendering to complete
-        await new Promise(resolve => setTimeout(resolve, 500));
-
-        console.log(`Capturing image for page ${i + 1}`);
         const imageResult = await uploadCanvasToImagesBucket(
-          canvas, 
-          `${projectName.replace(/\s+/g, '_')}_page_${i + 1}`
+          canvas,
+          `${projectName.replace(/\s+/g, '_')}_page_${activePage}`
         );
-        
-        console.log(`Uploading JSON for page ${i + 1}`);
+
         const jsonResult = await uploadJsonToBucket(
-          page.json || canvas.toJSON(), 
-          `${projectName.replace(/\s+/g, '_')}_page_${i + 1}_json`
+          canvas.toJSON(),
+          `${projectName.replace(/\s+/g, '_')}_page_${activePage}_json`
         );
 
         if (!imageResult.success) {
-          throw new Error(`Failed to upload page ${i + 1} image: ` + imageResult.error);
+          throw new Error('Failed to upload image: ' + imageResult.error);
         }
         if (!jsonResult.success) {
-          throw new Error(`Failed to upload page ${i + 1} JSON: ` + jsonResult.error);
+          throw new Error('Failed to upload JSON: ' + jsonResult.error);
         }
 
         imageUrls.push(imageResult.imageUrl);
         jsonUrls.push(jsonResult.jsonUrl);
-        pageNames.push(`${projectName} - Page ${i + 1}`);
-        
-        console.log(`Page ${i + 1} processed successfully - Image: ${imageResult.imageUrl}`);
-      }
-    }
+        pageNames.push(`${projectName} - Page ${activePage}`);
 
-    console.log('All files uploaded successfully:', {
-      images: imageUrls.length,
-      jsons: jsonUrls.length,
-      imageUrls: imageUrls,
-      jsonUrls: jsonUrls
-    });
-    
-    await sendEmail(email, projectName, imageUrls, jsonUrls, pageNames);
-    console.log('Email sent successfully');
-    
-  } catch (error) {
-    console.error('Error in handleSendEmail:', error);
-    throw new Error('Failed to send email: ' + error.message);
-  } 
-};
+      } else {
+        // Multiple pages export
+        console.log('Exporting all pages:', canvasList.length);
+
+        for (let i = 0; i < canvasList.length; i++) {
+          const page = canvasList[i];
+          console.log(`Processing page ${i + 1}/${canvasList.length}`, page);
+
+
+          if (page.json && page.json.objects && page.json.objects.length > 0) {
+            console.log(`Loading page ${i + 1} JSON data`);
+
+            // Load the page data onto canvas
+            await new Promise((resolve, reject) => {
+              try {
+                canvas.loadFromJSON(page.json, () => {
+                  canvas.renderAll();
+                  console.log(`Page ${i + 1} loaded successfully`);
+                  resolve();
+                });
+              } catch (loadError) {
+                console.error(`Error loading page ${i + 1}:`, loadError);
+                reject(loadError);
+              }
+            });
+          } else {
+            console.log(`Page ${i + 1} is empty, setting default background`);
+            // Set default background for empty pages
+          }
+
+          // Wait for rendering to complete
+          await new Promise(resolve => setTimeout(resolve, 500));
+
+          console.log(`Capturing image for page ${i + 1}`);
+          const imageResult = await uploadCanvasToImagesBucket(
+            canvas,
+            `${projectName.replace(/\s+/g, '_')}_page_${i + 1}`
+          );
+
+          console.log(`Uploading JSON for page ${i + 1}`);
+          const jsonResult = await uploadJsonToBucket(
+            page.json || canvas.toJSON(),
+            `${projectName.replace(/\s+/g, '_')}_page_${i + 1}_json`
+          );
+
+          if (!imageResult.success) {
+            throw new Error(`Failed to upload page ${i + 1} image: ` + imageResult.error);
+          }
+          if (!jsonResult.success) {
+            throw new Error(`Failed to upload page ${i + 1} JSON: ` + jsonResult.error);
+          }
+
+          imageUrls.push(imageResult.imageUrl);
+          jsonUrls.push(jsonResult.jsonUrl);
+          pageNames.push(`${projectName} - Page ${i + 1}`);
+
+          console.log(`Page ${i + 1} processed successfully - Image: ${imageResult.imageUrl}`);
+        }
+      }
+
+      console.log('All files uploaded successfully:', {
+        images: imageUrls.length,
+        jsons: jsonUrls.length,
+        imageUrls: imageUrls,
+        jsonUrls: jsonUrls
+      });
+
+      await sendEmail(email, projectName, imageUrls, jsonUrls, pageNames);
+      console.log('Email sent successfully');
+
+    } catch (error) {
+      console.error('Error in handleSendEmail:', error);
+      throw new Error('Failed to send email: ' + error.message);
+    }
+  };
 
 
   // Updated template handler function
-  const handleTemplateSelect = async (template) => {
-    try {
-      console.log("Applying template:", template.name);
+// In your template application function
+const handleTemplateSelect = async (template) => {
+  try {
+    console.log("Applying template:", template.name);
 
-      // Apply the template
-      await applyTemplateToCanvas(canvas, template);
+    // Apply the template
+    await applyTemplateToCanvas(canvas, template);
 
-      // Force multiple re-renders and state updates
-      canvas.renderAll();
-      canvas.requestRenderAll();
+    // Update current page state with template flags
+    const updatedCanvasList = canvasList.map((page) =>
+      page.id === activePage 
+        ? { 
+            ...page, 
+            json: canvas.toJSON(),
+            hasTemplates: true 
+          } 
+        : page
+    );
 
-      // Force a state update to trigger React re-render
-      setCanvasList((prev) => [...prev]);
+    setCanvasList(updatedCanvasList);
 
-      // Close the modal after a small delay to ensure rendering is complete
-      setTimeout(() => {
-        setIsModalOpen(false);
-      }, 100);
-    } catch (error) {
-      console.error("Failed to apply template:", error);
-      alert("Failed to load template. Please try again.");
-    }
-  };
+    // Force multiple re-renders
+    canvas.renderAll();
+    canvas.requestRenderAll();
+
+    // Close the modal after a small delay
+    setTimeout(() => {
+      setIsModalOpen(false);
+    }, 100);
+  } catch (error) {
+    console.error("Failed to apply template:", error);
+    alert("Failed to load template. Please try again.");
+  }
+};
 
   // Function to upload canvas as image and get URL
   const uploadCanvasImage = async (canvasInstance, fileName) => {
@@ -469,7 +480,7 @@ const handleSendEmail = async (email, projectName, exportOption, canvasList, act
   const exportCurrentCanvasAsJson = async (pageName) => {
     try {
       const canvasJson = canvas.toJSON();
-      
+
       // Upload page image
       let pageImageUrl = "";
       try {
@@ -574,7 +585,7 @@ const handleSendEmail = async (email, projectName, exportOption, canvasList, act
         canvas.setBackgroundColor("#ffffff", () => {
           canvas.requestRenderAll();
         });
-      } 
+      }
     } catch (error) {
       console.error("Error switching page:", error);
     }
@@ -770,14 +781,14 @@ const handleSendEmail = async (email, projectName, exportOption, canvasList, act
         canvas={canvas}
       />
 
-<EmailModal
-  isOpen={isEmailModalOpen}
-  onClose={() => setIsEmailModalOpen(false)}
-  onSendEmail={handleSendEmail}
-  fileName={currentProject?.project_name || "My Design"}
-  canvasList={canvasList}
-  activePage={activePage}
-/>
+      <EmailModal
+        isOpen={isEmailModalOpen}
+        onClose={() => setIsEmailModalOpen(false)}
+        onSendEmail={handleSendEmail}
+        fileName={currentProject?.project_name || "My Design"}
+        canvasList={canvasList}
+        activePage={activePage}
+      />
 
       {/* Page Management Section */}
       <section className="bg-white/80 backdrop-blur-sm border-b border-gray-200/50 px-3 py-2">
@@ -895,11 +906,10 @@ const handleSendEmail = async (email, projectName, exportOption, canvasList, act
                 <button
                   key={page.id}
                   onClick={() => switchPage(page.id)}
-                  className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-all duration-200 min-w-[90px] shadow-sm flex-shrink-0 ${
-                    activePage === page.id
+                  className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-all duration-200 min-w-[90px] shadow-sm flex-shrink-0 ${activePage === page.id
                       ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-md"
                       : "bg-white text-gray-700 hover:bg-gray-50 border border-gray-200 hover:border-gray-300"
-                  }`}
+                    }`}
                 >
                   Page {index + 1}
                 </button>
@@ -988,9 +998,8 @@ const handleSendEmail = async (email, projectName, exportOption, canvasList, act
 
         {/* Sidebar */}
         <div
-          className={`bg-white h-full w-64 z-50 transition-all duration-300 md:relative md:translate-x-0 fixed top-0 left-0 shadow-xl ${
-            mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
-          } md:shadow-none`}
+          className={`bg-white h-full w-64 z-50 transition-all duration-300 md:relative md:translate-x-0 fixed top-0 left-0 shadow-xl ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+            } md:shadow-none`}
         >
           <div className="flex justify-between items-center p-4 border-b border-gray-200 md:hidden">
             <h2 className="text-lg font-bold text-gray-800">Design Tools</h2>
@@ -1018,7 +1027,9 @@ const handleSendEmail = async (email, projectName, exportOption, canvasList, act
               )}
               {tool === "Shapes" && <ShapeTool action={handler} />}
               {tool === "Background" && (
-                <BGTool addBackground={(url) => addBG(canvas, url)} />
+                <BGTool
+                  addBackground={(url) => addBG(canvas, url, canvasList)}
+                />
               )}
               {tool === "School Logo" && (
                 <LogoTool addBackground={(url) => addLogo(canvas, url)} />
@@ -1161,15 +1172,15 @@ const handleSendEmail = async (email, projectName, exportOption, canvasList, act
         {/* Left side - Development Partner */}
         <div className="flex items-center gap-2">
           <span className="text-xs text-gray-600 font-medium">Development Partner</span>
-          <a 
-            href="https://gobt.in/" 
-            target="_blank" 
+          <a
+            href="https://gobt.in/"
+            target="_blank"
             rel="noopener noreferrer"
             className="hover:opacity-80 transition-opacity"
           >
-            <img 
-              src="https://dtpszuxlofjlvbqqxsep.supabase.co/storage/v1/object/public/gobtlogo/WhatsApp_Image_2025-11-21_at_10.43.40_PM-removebg-preview.png" 
-              alt="GOBT.in" 
+            <img
+              src="https://dtpszuxlofjlvbqqxsep.supabase.co/storage/v1/object/public/gobtlogo/WhatsApp_Image_2025-11-21_at_10.43.40_PM-removebg-preview.png"
+              alt="GOBT.in"
               className="h-12 object-contain"
               onError={(e) => {
                 e.target.style.display = 'none';
@@ -1182,7 +1193,7 @@ const handleSendEmail = async (email, projectName, exportOption, canvasList, act
         </div>
 
         {/* Right side - Logo */}
-       
+
       </footer>
     </div>
   );
