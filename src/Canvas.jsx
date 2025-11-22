@@ -361,40 +361,40 @@ function App() {
 
 
   // Updated template handler function
-// In your template application function
-const handleTemplateSelect = async (template) => {
-  try {
-    console.log("Applying template:", template.name);
+  // In your template application function
+  const handleTemplateSelect = async (template) => {
+    try {
+      console.log("Applying template:", template.name);
 
-    // Apply the template
-    await applyTemplateToCanvas(canvas, template);
+      // Apply the template
+      await applyTemplateToCanvas(canvas, template);
 
-    // Update current page state with template flags
-    const updatedCanvasList = canvasList.map((page) =>
-      page.id === activePage 
-        ? { 
-            ...page, 
+      // Update current page state with template flags
+      const updatedCanvasList = canvasList.map((page) =>
+        page.id === activePage
+          ? {
+            ...page,
             json: canvas.toJSON(),
-            hasTemplates: true 
-          } 
-        : page
-    );
+            hasTemplates: true
+          }
+          : page
+      );
 
-    setCanvasList(updatedCanvasList);
+      setCanvasList(updatedCanvasList);
 
-    // Force multiple re-renders
-    canvas.renderAll();
-    canvas.requestRenderAll();
+      // Force multiple re-renders
+      canvas.renderAll();
+      canvas.requestRenderAll();
 
-    // Close the modal after a small delay
-    setTimeout(() => {
-      setIsModalOpen(false);
-    }, 100);
-  } catch (error) {
-    console.error("Failed to apply template:", error);
-    alert("Failed to load template. Please try again.");
-  }
-};
+      // Close the modal after a small delay
+      setTimeout(() => {
+        setIsModalOpen(false);
+      }, 100);
+    } catch (error) {
+      console.error("Failed to apply template:", error);
+      alert("Failed to load template. Please try again.");
+    }
+  };
 
   // Function to upload canvas as image and get URL
   const uploadCanvasImage = async (canvasInstance, fileName) => {
@@ -887,9 +887,10 @@ const handleTemplateSelect = async (template) => {
             </div>
 
             {/* Zoom Bar */}
-            <div className="min-w-[120px] flex-shrink-0">
+            <div className="hidden md:block min-w-[120px] flex-shrink-0">
               <ZoomBar zoom={zoom} setZoom={handleZoomChange} />
             </div>
+
           </div>
         </div>
       </section>
@@ -907,8 +908,8 @@ const handleTemplateSelect = async (template) => {
                   key={page.id}
                   onClick={() => switchPage(page.id)}
                   className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-all duration-200 min-w-[90px] shadow-sm flex-shrink-0 ${activePage === page.id
-                      ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-md"
-                      : "bg-white text-gray-700 hover:bg-gray-50 border border-gray-200 hover:border-gray-300"
+                    ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-md"
+                    : "bg-white text-gray-700 hover:bg-gray-50 border border-gray-200 hover:border-gray-300"
                     }`}
                 >
                   Page {index + 1}

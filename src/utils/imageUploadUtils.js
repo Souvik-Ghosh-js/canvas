@@ -2,10 +2,12 @@ import { supabase } from '../supabase/config';
 // Upload canvas as image to separate images bucket (no database entry)
 export const uploadCanvasToImagesBucket = async (canvas, fileName = 'design') => {
   try {
-    // Convert canvas to data URL
+    // Method 1: Using Fabric.js built-in high-quality export
     const dataURL = canvas.toDataURL({
       format: 'png',
-      quality: 0.9,
+      quality: 1.0, // Maximum quality
+      multiplier: 2, // 2x resolution for retina/high DPI
+      enableRetinaScaling: true
     });
 
     // Convert data URL to blob
@@ -16,9 +18,9 @@ export const uploadCanvasToImagesBucket = async (canvas, fileName = 'design') =>
     const timestamp = new Date().getTime();
     const uniqueFileName = `${fileName}_${timestamp}.png`;
 
-    // Upload to Supabase images bucket (no database entry)
+    // Upload to Supabase images bucket
     const { data, error } = await supabase.storage
-      .from('images') // Separate bucket
+      .from('images')
       .upload(uniqueFileName, blob, {
         contentType: 'image/png',
         upsert: false
