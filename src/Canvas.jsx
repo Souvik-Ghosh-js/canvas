@@ -291,8 +291,6 @@ const handleSendEmail = async (email, projectName, exportOption, canvasList, act
         const page = canvasList[i];
         console.log(`Processing page ${i + 1}/${canvasList.length}`, page);
         
-        // Clear the canvas completely
-        canvas.clear();
         
         if (page.json && page.json.objects && page.json.objects.length > 0) {
           console.log(`Loading page ${i + 1} JSON data`);
@@ -313,9 +311,6 @@ const handleSendEmail = async (email, projectName, exportOption, canvasList, act
         } else {
           console.log(`Page ${i + 1} is empty, setting default background`);
           // Set default background for empty pages
-          canvas.setBackgroundColor('#ffffff', () => {
-            canvas.renderAll();
-          });
         }
 
         // Wait for rendering to complete
@@ -361,24 +356,7 @@ const handleSendEmail = async (email, projectName, exportOption, canvasList, act
   } catch (error) {
     console.error('Error in handleSendEmail:', error);
     throw new Error('Failed to send email: ' + error.message);
-  } finally {
-    // Always restore the original canvas state
-    if (originalCanvasState) {
-      try {
-        console.log('Restoring original canvas state');
-        canvas.clear();
-        await new Promise((resolve) => {
-          canvas.loadFromJSON(originalCanvasState, () => {
-            canvas.renderAll();
-            console.log('Canvas state restored successfully');
-            resolve();
-          });
-        });
-      } catch (restoreError) {
-        console.error('Failed to restore canvas state:', restoreError);
-      }
-    }
-  }
+  } 
 };
 
 

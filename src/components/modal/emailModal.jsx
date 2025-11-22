@@ -26,17 +26,20 @@ function EmailModal({ isOpen, onClose, onSendEmail, fileName = "design", canvasL
         activePage
       );
       setMessage(`Email sent successfully to mohinidotmohini@gmail.com with ${exportOption === 'current' ? 'current page' : 'all pages'}!`);
+      
+      // Wait a bit for canvas restoration to complete, then close
       setTimeout(() => {
         onClose();
         setProjectName(fileName);
         setMessage("");
         setExportOption("current");
-      }, 2000);
+      }, 1000); // Reduced from 2000 to 1000ms
     } catch (error) {
       setMessage(error.message || "Failed to send email. Please try again.");
-    } finally {
-      setIsLoading(false);
+      setIsLoading(false); // Only set loading false on error
     }
+    // Remove finally block - don't set isLoading false here
+    // Let the success case handle it through the timeout
   };
 
   if (!isOpen) return null;
