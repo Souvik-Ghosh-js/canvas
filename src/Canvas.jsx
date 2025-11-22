@@ -559,37 +559,78 @@ function App() {
   };
 
   // Function to switch between pages
-  const switchPage = (pageId) => {
-    if (!canvas || activePage === pageId) return;
-    try {
-      // Save current page state
-      const updatedCanvasList = canvasList.map((page) =>
-        page.id === activePage ? { ...page, json: canvas.toJSON() } : page
-      );
+const switchPage = (pageId) => {
+  if (!canvas || activePage === pageId) return;
+  try {
+    // Save current page state
+    const updatedCanvasList = canvasList.map((page) =>
+      page.id === activePage ? { ...page, json: canvas.toJSON() } : page
+    );
 
-      setCanvasList(updatedCanvasList);
-      setActivePage(pageId);
+    setCanvasList(updatedCanvasList);
+    setActivePage(pageId);
 
-      // Load the selected page
-      const selectedPage = updatedCanvasList.find((p) => p.id === pageId);
+    // Load the selected page
+    const selectedPage = updatedCanvasList.find((p) => p.id === pageId);
 
-
-
-      if (selectedPage?.json) {
-        canvas.loadFromJSON(selectedPage.json).then(() => {
-          canvas.requestRenderAll();
-        });
-      } else {
-        // Set default background for empty page
-        canvas.clear();
-        canvas.setBackgroundColor("#ffffff", () => {
-          canvas.requestRenderAll();
-        });
-      }
-    } catch (error) {
-      console.error("Error switching page:", error);
+    if (selectedPage?.json) {
+      canvas.loadFromJSON(selectedPage.json).then(() => {
+        // Check if ANY page has templates and adjust background scaling
+        checkAndAdjustBackgroundForTemplates(canvas, updatedCanvasList);
+        canvas.requestRenderAll();
+      });
+    } else {
+      // Set default background for empty page
+      canvas.clear();
+      canvas.setBackgroundColor("#ffffff", () => {
+        // Still check for templates in other pages
+        checkAndAdjustBackgroundForTemplates(canvas, updatedCanvasList);
+        canvas.requestRenderAll();
+      });
     }
-  };
+  } catch (error) {
+    console.error("Error switching page:", error);
+  }
+};
+
+// Helper function to check templates and adjust background
+const checkAndAdjustBackgroundForTemplates = (canvas, allPages) => {
+  const backgroundImage = canvas.backgroundImage;
+  if (!backgroundImage) return;
+
+  // Check if ANY page has the hasTemplates flag
+  const anyPageHasTemplates = allPages.some(page => 
+    page.hasTemplates === true || 
+    page.json?.hasTemplates === true
+  );
+
+  const cw = canvas.getWidth();
+  const ch = canvas.getHeight();
+
+  if (anyPageHasTemplates) {
+    // Apply template scaling
+    console.log('Template detected in pages - applying template scaling');
+    backgroundImage.set({
+      scaleX: 0.3928,
+      scaleY: 0.3614,
+      originX: 'left',
+      originY: 'top'
+    });
+    canvas.backgroundImageStretch = true;
+  } else {
+    // Apply regular scaling
+    console.log('No templates found - applying regular scaling');
+    const scaleX = cw / backgroundImage.width;
+    const scaleY = ch / backgroundImage.height;
+    backgroundImage.set({
+      scaleX: scaleX,
+      scaleY: scaleY,
+      originX: 'left',
+      originY: 'top'
+    });
+    canvas.backgroundImageStretch = false;
+  }
+};
 
   // Enhanced layer control functions
   const handleBringForward = () => {
