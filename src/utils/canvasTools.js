@@ -71,9 +71,15 @@ export const addHeadingText = (canvas) => {
       fill: "black",
       fontWeight: 700,
       textAlign: "center",
+      editable: true, // Enable editing
+      editingBorderColor: 'blue', // Visual indicator when editing
       opacity: 1,
     })
   );
+   setTimeout(() => {
+    text.enterEditing();
+    text.selectAll();
+  }, 100);
 };
 
 export const addSubHeadingText = (canvas) => {
