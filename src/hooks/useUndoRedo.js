@@ -1,69 +1,151 @@
 // hooks/useHistory.js
-import { useState, useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+
+const MAX_HISTORY = 50;
 
 const useHistory = (canvas) => {
-  const [history, setHistory] = useState([]);
-  const [redoStack, setRedoStack] = useState([]);
+  const historyRef = useRef([]);
+  const redoRef = useRef([]);
+  const isRestoring = useRef(false);
+  const debounceTimer = useRef(null);
 
-  // Save current state
+  const [, forceUpdate] = useState(0); // for UI re-render only
+
+  const updateUI = () => forceUpdate((n) => n + 1);
+
+  // ✅ SAFE SAVE STATE
   const saveState = useCallback(() => {
-    if (!canvas) return;
-    const json = canvas.toJSON(["selectable", "evented"]);
-    setHistory((prev) => [...prev, json]);
-    setRedoStack([]); // clear redo stack on new action
+    if (!canvas || isRestoring.current) return;
+
+    clearTimeout(debounceTimer.current);
+
+    debounceTimer.current = setTimeout(() => {
+      const json = canvas.toJSON(["selectable", "evented"]);
+      const last = historyRef.current.at(-1);
+
+      if (JSON.stringify(last) === JSON.stringify(json)) return;
+
+      historyRef.current.push(json);
+
+      if (historyRef.current.length > MAX_HISTORY) {
+        historyRef.current.shift();
+      }
+
+      redoRef.current = []; // clear redo on new change
+      updateUI();
+    }, 150);
   }, [canvas]);
 
-  // Undo
   const undo = useCallback(() => {
-    if (!canvas || history.length <= 1) return;
+    if (!canvas || historyRef.current.length <= 1) return;
 
-    const newHistory = [...history];
-    const last = newHistory.pop();
-    setRedoStack((prev) => [...prev, last]);
+    isRestoring.current = true;
 
-    const previous = newHistory[newHistory.length - 1];
-    setHistory(newHistory);
-    canvas.loadFromJSON(previous).then(() => canvas.requestRenderAll());
-  }, [canvas, history]);
+    const current = historyRef.current.pop();
+    redoRef.current.push(current);
 
-  // Redo
+    const previous = historyRef.current.at(-1);
+
+    canvas.loadFromJSON(previous, () => {
+      canvas.getObjects().forEach((obj) => {
+        obj.set({
+          selectable: true,
+          evented: true,
+          visible: true,
+        });
+      });
+
+      canvas.discardActiveObject();
+      canvas.calcOffset(); // ✅ FIX HITBOX
+      canvas.requestRenderAll(); // ✅ FORCE REFRESH
+      isRestoring.current = false;
+      updateUI();
+    });
+  }, [canvas]);
+
   const redo = useCallback(() => {
-    if (!canvas || redoStack.length === 0) return;
+    if (!canvas || redoRef.current.length === 0) return;
 
-    const newRedo = [...redoStack];
-    const next = newRedo.pop();
-    setRedoStack(newRedo);
+    isRestoring.current = true;
 
-    setHistory((prev) => [...prev, next]);
+    const next = redoRef.current.pop();
+    historyRef.current.push(next);
 
     canvas.loadFromJSON(next, () => {
-      canvas.renderAll();
-    });
-  }, [canvas, redoStack]);
+      canvas.getObjects().forEach((obj) => {
+        obj.set({
+          selectable: true,
+          evented: true,
+          visible: true,
+        });
+      });
 
-  // Save state on canvas changes
+      canvas.discardActiveObject();
+      canvas.calcOffset(); // ✅ FIX HITBOX
+      canvas.requestRenderAll(); // ✅ FORCE REFRESH
+      isRestoring.current = false;
+      updateUI();
+    });
+  }, [canvas]);
+
+  // ✅ FABRIC EVENT BINDING
   useEffect(() => {
     if (!canvas) return;
-    const handleChange = () => saveState();
-    canvas.on("object:added", handleChange);
-    canvas.on("object:modified", handleChange);
-    canvas.on("object:removed", handleChange);
 
-    // Save initial state
-    saveState();
+    const handler = () => saveState();
+
+    canvas.on("object:added", handler);
+    canvas.on("object:modified", handler);
+    canvas.on("object:removed", handler);
+
+    // ✅ Save first empty state ONLY ONCE
+    if (historyRef.current.length === 0) {
+      const initial = canvas.toJSON(["selectable", "evented"]);
+      historyRef.current.push(initial);
+    }
 
     return () => {
-      canvas.off("object:added", handleChange);
-      canvas.off("object:modified", handleChange);
-      canvas.off("object:removed", handleChange);
+      canvas.off("object:added", handler);
+      canvas.off("object:modified", handler);
+      canvas.off("object:removed", handler);
     };
   }, [canvas, saveState]);
+  // ✅ KEYBOARD SHORTCUTS: CTRL + Z / CTRL + Y
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Undo → Ctrl + Z
+      if (e.ctrlKey && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        undo();
+      }
+
+      // Redo → Ctrl + Y
+      if (e.ctrlKey && e.key.toLowerCase() === "y") {
+        e.preventDefault();
+        redo();
+      }
+
+      // ✅ Optional: Ctrl + Shift + Z for Redo (Design software style)
+      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        redo();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [undo, redo]);
 
   return {
     undo,
     redo,
-    canUndo: history.length > 1,
-    canRedo: redoStack.length > 0,
+    canUndo: historyRef.current.length > 1,
+    canRedo: redoRef.current.length > 0,
+    history: historyRef.current,
+    redoStack: redoRef.current,
   };
 };
 
