@@ -41,7 +41,6 @@ import * as tools from "./utils/canvasTools";
 import { addImage } from "./utils/imageTools";
 import { addBG } from "./utils/backGroundTool";
 import { addLogo } from "./utils/LogoTool";
-import { addWordCurve } from "./utils/wordCurveTool";
 import { applyTemplateToCanvas } from "./utils/templateUtils";
 import { bringForward, sendBackward } from "./utils/layerUtils";
 import { deleteActiveObject, handleDelete } from "./utils/deleteUtils";
@@ -52,6 +51,13 @@ import {
   loadPageToCanvas,
 } from "./utils/pageUtils";
 import { uploadCanvasToImagesBucket, uploadJsonToBucket } from "./utils/imageUploadUtils";
+import { addCurvedText,updateCurvedText, CURVE_STYLES, getAvailableFonts } from './utils/CurvedTextTool.jsx';
+import { Modal, Button, Slider, Select, Input, Radio, ColorPicker, Space } from 'antd';
+import {
+  BoldOutlined,
+  ItalicOutlined,
+  UnderlineOutlined
+} from '@ant-design/icons';
 
 import {
   exportAsPNG,
@@ -66,6 +72,110 @@ import { exportMultipleJsonToPDF } from "./utils/exportMultiPagePDF";
 import { sendEmail } from "./utils/emailService";
 
 function App() {
+  const { Option } = Select;
+  const [showCurvedTextTool, setShowCurvedTextTool] = useState(false);
+  const [curveText, setCurveText] = useState("Curved Text");
+  const [curveStyle, setCurveStyle] = useState(CURVE_STYLES.ARCH);
+  const [curveFontSize, setCurveFontSize] = useState(40);
+  const [curveFontFamily, setCurveFontFamily] = useState("Arial");
+  const [curveFontWeight, setCurveFontWeight] = useState("normal");
+  const [curveFontStyle, setCurveFontStyle] = useState("normal");
+  const [curveUnderline, setCurveUnderline] = useState(false);
+  const [curveColor, setCurveColor] = useState("#333333");
+  const [curveBorderColor, setCurveBorderColor] = useState("#000000");
+  const [curveBorderWidth, setCurveBorderWidth] = useState(0);
+  const [curveRadius, setCurveRadius] = useState(200);
+  const [curveAmplitude, setCurveAmplitude] = useState(60);
+  const [curveLetterSpacing, setCurveLetterSpacing] = useState(0);
+  const [curveReverse, setCurveReverse] = useState(false);
+  const [curveIntensity, setCurveIntensity] = useState(1);
+
+  const curveStyleIcons = {
+    [CURVE_STYLES.ARCH]: "🏛️",
+    [CURVE_STYLES.CIRCLE]: "⭕",
+    [CURVE_STYLES.WAVE]: "🌊",
+    [CURVE_STYLES.INVERTED_ARCH]: "⬇️",
+    [CURVE_STYLES.SPIRAL]: "🌀",
+    [CURVE_STYLES.RAINBOW]: "🌈",
+    [CURVE_STYLES.FLAG]: "🎌"
+  };
+
+  const handleAddCurvedText = () => {
+    addCurvedText(canvas, {
+      text: curveText,
+      curveStyle,
+      fontSize: curveFontSize,
+      fontFamily: curveFontFamily,
+      fontWeight: curveFontWeight,
+      fontStyle: curveFontStyle,
+      underline: curveUnderline,
+      color: curveColor,
+      borderColor: curveBorderColor,
+      borderWidth: curveBorderWidth,
+      radius: curveRadius,
+      amplitude: curveAmplitude,
+      letterSpacing: curveLetterSpacing,
+      reverse: curveReverse,
+      curveIntensity: curveIntensity,
+      removeExisting: false // Don't remove existing curves automatically
+    });
+    setShowCurvedTextTool(false);
+  };
+
+  const handleCreateNewCurvedText = () => {
+    // This will ALWAYS create a new curved text, keeping existing ones
+    addCurvedText(canvas, {
+      text: curveText,
+      curveStyle,
+      fontSize: curveFontSize,
+      fontFamily: curveFontFamily,
+      fontWeight: curveFontWeight,
+      fontStyle: curveFontStyle,
+      underline: curveUnderline,
+      color: curveColor,
+      borderColor: curveBorderColor,
+      borderWidth: curveBorderWidth,
+      radius: curveRadius,
+      amplitude: curveAmplitude,
+      letterSpacing: curveLetterSpacing,
+      reverse: curveReverse,
+      curveIntensity: curveIntensity,
+      removeExisting: false // NEVER remove existing
+    });
+    setShowCurvedTextTool(false);
+  };
+
+const handleReplaceCurvedText = () => {
+  // This will ONLY replace the selected curved text
+  const activeObject = canvas.getActiveObject();
+  const isCurvedText = activeObject?.customType === "curvedText";
+  
+  if (isCurvedText) {
+    // Replace ONLY the selected one, leave others untouched
+    updateCurvedText(canvas, activeObject, {
+      text: curveText,
+      curveStyle,
+      fontSize: curveFontSize,
+      fontFamily: curveFontFamily,
+      fontWeight: curveFontWeight,
+      fontStyle: curveFontStyle,
+      underline: curveUnderline,
+      color: curveColor,
+      borderColor: curveBorderColor,
+      borderWidth: curveBorderWidth,
+      radius: curveRadius,
+      amplitude: curveAmplitude,
+      letterSpacing: curveLetterSpacing,
+      reverse: curveReverse,
+      curveIntensity: curveIntensity
+    });
+  } else {
+    // No curved text selected, show warning
+    message.warning('Please select a curved text object to replace');
+  }
+  setShowCurvedTextTool(false);
+};
+
   const { canvasRef, canvas, designSize } = useFabricCanvas();
   const [canvasList, setCanvasList] = useState([{ id: 1, json: null }]);
   const [activePage, setActivePage] = useState(1);
@@ -559,78 +669,78 @@ function App() {
   };
 
   // Function to switch between pages
-const switchPage = (pageId) => {
-  if (!canvas || activePage === pageId) return;
-  try {
-    // Save current page state
-    const updatedCanvasList = canvasList.map((page) =>
-      page.id === activePage ? { ...page, json: canvas.toJSON() } : page
+  const switchPage = (pageId) => {
+    if (!canvas || activePage === pageId) return;
+    try {
+      // Save current page state
+      const updatedCanvasList = canvasList.map((page) =>
+        page.id === activePage ? { ...page, json: canvas.toJSON() } : page
+      );
+
+      setCanvasList(updatedCanvasList);
+      setActivePage(pageId);
+
+      // Load the selected page
+      const selectedPage = updatedCanvasList.find((p) => p.id === pageId);
+
+      if (selectedPage?.json) {
+        canvas.loadFromJSON(selectedPage.json).then(() => {
+          // Check if ANY page has templates and adjust background scaling
+          checkAndAdjustBackgroundForTemplates(canvas, updatedCanvasList);
+          canvas.requestRenderAll();
+        });
+      } else {
+        // Set default background for empty page
+        canvas.clear();
+        canvas.setBackgroundColor("#ffffff", () => {
+          // Still check for templates in other pages
+          checkAndAdjustBackgroundForTemplates(canvas, updatedCanvasList);
+          canvas.requestRenderAll();
+        });
+      }
+    } catch (error) {
+      console.error("Error switching page:", error);
+    }
+  };
+
+  // Helper function to check templates and adjust background
+  const checkAndAdjustBackgroundForTemplates = (canvas, allPages) => {
+    const backgroundImage = canvas.backgroundImage;
+    if (!backgroundImage) return;
+
+    // Check if ANY page has the hasTemplates flag
+    const anyPageHasTemplates = allPages.some(page =>
+      page.hasTemplates === true ||
+      page.json?.hasTemplates === true
     );
 
-    setCanvasList(updatedCanvasList);
-    setActivePage(pageId);
+    const cw = canvas.getWidth();
+    const ch = canvas.getHeight();
 
-    // Load the selected page
-    const selectedPage = updatedCanvasList.find((p) => p.id === pageId);
-
-    if (selectedPage?.json) {
-      canvas.loadFromJSON(selectedPage.json).then(() => {
-        // Check if ANY page has templates and adjust background scaling
-        checkAndAdjustBackgroundForTemplates(canvas, updatedCanvasList);
-        canvas.requestRenderAll();
+    if (anyPageHasTemplates) {
+      // Apply template scaling
+      console.log('Template detected in pages - applying template scaling');
+      backgroundImage.set({
+        scaleX: 0.3928,
+        scaleY: 0.3614,
+        originX: 'left',
+        originY: 'top'
       });
+      canvas.backgroundImageStretch = true;
     } else {
-      // Set default background for empty page
-      canvas.clear();
-      canvas.setBackgroundColor("#ffffff", () => {
-        // Still check for templates in other pages
-        checkAndAdjustBackgroundForTemplates(canvas, updatedCanvasList);
-        canvas.requestRenderAll();
+      // Apply regular scaling
+      console.log('No templates found - applying regular scaling');
+      const scaleX = cw / backgroundImage.width;
+      const scaleY = ch / backgroundImage.height;
+      backgroundImage.set({
+        scaleX: scaleX,
+        scaleY: scaleY,
+        originX: 'left',
+        originY: 'top'
       });
+      canvas.backgroundImageStretch = false;
     }
-  } catch (error) {
-    console.error("Error switching page:", error);
-  }
-};
-
-// Helper function to check templates and adjust background
-const checkAndAdjustBackgroundForTemplates = (canvas, allPages) => {
-  const backgroundImage = canvas.backgroundImage;
-  if (!backgroundImage) return;
-
-  // Check if ANY page has the hasTemplates flag
-  const anyPageHasTemplates = allPages.some(page => 
-    page.hasTemplates === true || 
-    page.json?.hasTemplates === true
-  );
-
-  const cw = canvas.getWidth();
-  const ch = canvas.getHeight();
-
-  if (anyPageHasTemplates) {
-    // Apply template scaling
-    console.log('Template detected in pages - applying template scaling');
-    backgroundImage.set({
-      scaleX: 0.3928,
-      scaleY: 0.3614,
-      originX: 'left',
-      originY: 'top'
-    });
-    canvas.backgroundImageStretch = true;
-  } else {
-    // Apply regular scaling
-    console.log('No templates found - applying regular scaling');
-    const scaleX = cw / backgroundImage.width;
-    const scaleY = ch / backgroundImage.height;
-    backgroundImage.set({
-      scaleX: scaleX,
-      scaleY: scaleY,
-      originX: 'left',
-      originY: 'top'
-    });
-    canvas.backgroundImageStretch = false;
-  }
-};
+  };
 
   // Enhanced layer control functions
   const handleBringForward = () => {
@@ -1059,10 +1169,207 @@ const checkAndAdjustBackgroundForTemplates = (canvas, allPages) => {
               onClose={() => setIsModalOpen(false)}
             >
               {tool === "Text" && (
-                <TextTool
-                  action={handler}
-                  addWordCurvature={() => addWordCurve(canvas)}
-                />
+                <>
+                  <TextTool action={handler} />
+                  <Button
+                    icon={<FaTextHeight className="text-blue-600" />}
+                    onClick={() => setShowCurvedTextTool(true)}
+                  >
+                    Curved Text
+                  </Button>
+
+                  <Modal
+                    title="✨ Curved Text Editor"
+                    open={showCurvedTextTool}
+                    onCancel={() => setShowCurvedTextTool(false)}
+                    footer={[
+                      <Button key="cancel" onClick={() => setShowCurvedTextTool(false)}>
+                        Cancel
+                      </Button>,
+                      <Button
+                        key="create"
+                        type="primary"
+                        onClick={handleCreateNewCurvedText}
+                        title="Creates a new curved text object"
+                      >
+                        ✨ Create New
+                      </Button>,
+                      <Button
+                        key="replace"
+                        onClick={handleReplaceCurvedText}
+                        title="Replaces the selected curved text object"
+                      >
+                        🔄 Replace Selected
+                      </Button>
+                    ]}
+                    width={450}
+                  >
+                    {/* Add a helpful info message */}
+                    <div style={{ marginBottom: 16, padding: '8px 12px', background: '#f0f5ff', borderRadius: 6, fontSize: 13 }}>
+                      <strong>💡 How to use:</strong><br />
+                      • <strong>Create New</strong> - Adds a new curved text while keeping existing ones<br />
+                      • <strong>Replace Selected</strong> - Updates the currently selected curved text (select it first!)
+                    </div>
+                    <div style={{ padding: "10px 0" }}>
+                      {/* Text Input */}
+                      <div style={{ marginBottom: 16 }}>
+                        <label style={{ display: 'block', marginBottom: 4 }}>Text:</label>
+                        <Input
+                          value={curveText}
+                          onChange={(e) => setCurveText(e.target.value)}
+                          placeholder="Enter your text"
+                        />
+                      </div>
+
+                      {/* Curve Style Selection */}
+                      <div style={{ marginBottom: 16 }}>
+                        <label style={{ display: 'block', marginBottom: 4 }}>Curve Style:</label>
+                        <Radio.Group
+                          value={curveStyle}
+                          onChange={(e) => setCurveStyle(e.target.value)}
+                          style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px" }}
+                        >
+                          {Object.entries(curveStyleIcons).map(([style, icon]) => (
+                            <Radio.Button key={style} value={style} style={{ textAlign: "center", padding: "8px" }}>
+                              <div style={{ fontSize: "20px" }}>{icon}</div>
+                              <div style={{ fontSize: "11px" }}>{style.split('-')[0]}</div>
+                            </Radio.Button>
+                          ))}
+                        </Radio.Group>
+                      </div>
+
+                      {/* Font Family */}
+                      <div style={{ marginBottom: 16 }}>
+                        <label style={{ display: 'block', marginBottom: 4 }}>Font Family:</label>
+                        <Select
+                          value={curveFontFamily}
+                          onChange={setCurveFontFamily}
+                          style={{ width: "100%" }}
+                        >
+                          {getAvailableFonts().map(font => (
+                            <Option key={font} value={font} style={{ fontFamily: font }}>{font}</Option>
+                          ))}
+                        </Select>
+                      </div>
+
+                      {/* Font Size */}
+                      <div style={{ marginBottom: 16 }}>
+                        <label style={{ display: 'block', marginBottom: 4 }}>Font Size: {curveFontSize}px</label>
+                        <Slider
+                          min={20}
+                          max={120}
+                          value={curveFontSize}
+                          onChange={setCurveFontSize}
+                        />
+                      </div>
+
+                      {/* Text Style Buttons */}
+                      <div style={{ marginBottom: 16, display: "flex", gap: "8px" }}>
+                        <Button
+                          type={curveFontWeight === "bold" ? "primary" : "default"}
+                          icon={<BoldOutlined />}
+                          onClick={() => setCurveFontWeight(curveFontWeight === "bold" ? "normal" : "bold")}
+                        />
+                        <Button
+                          type={curveFontStyle === "italic" ? "primary" : "default"}
+                          icon={<ItalicOutlined />}
+                          onClick={() => setCurveFontStyle(curveFontStyle === "italic" ? "normal" : "italic")}
+                        />
+                        <Button
+                          type={curveUnderline ? "primary" : "default"}
+                          icon={<UnderlineOutlined />}
+                          onClick={() => setCurveUnderline(!curveUnderline)}
+                        />
+                      </div>
+
+                      {/* Text Color */}
+                      <div style={{ marginBottom: 16 }}>
+                        <label style={{ display: 'block', marginBottom: 4 }}>Text Color:</label>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <input
+                            type="color"
+                            value={curveColor}
+                            onChange={(e) => setCurveColor(e.target.value)}
+                            style={{ width: "40px", height: "40px" }}
+                          />
+                          <Input
+                            value={curveColor}
+                            onChange={(e) => setCurveColor(e.target.value)}
+                            style={{ width: "100px" }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Border */}
+                      <div style={{ marginBottom: 16 }}>
+                        <label style={{ display: 'block', marginBottom: 4 }}>Border Width: {curveBorderWidth}px</label>
+                        <Slider
+                          min={0}
+                          max={10}
+                          value={curveBorderWidth}
+                          onChange={setCurveBorderWidth}
+                        />
+                        {curveBorderWidth > 0 && (
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "8px" }}>
+                            <label>Border Color:</label>
+                            <input
+                              type="color"
+                              value={curveBorderColor}
+                              onChange={(e) => setCurveBorderColor(e.target.value)}
+                              style={{ width: "40px", height: "40px" }}
+                            />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Curve Parameters */}
+                      {[CURVE_STYLES.ARCH, CURVE_STYLES.CIRCLE, CURVE_STYLES.INVERTED_ARCH].includes(curveStyle) && (
+                        <div style={{ marginBottom: 16 }}>
+                          <label style={{ display: 'block', marginBottom: 4 }}>Curve Radius: {curveRadius}px</label>
+                          <Slider min={100} max={400} value={curveRadius} onChange={setCurveRadius} />
+                        </div>
+                      )}
+
+                      {curveStyle === CURVE_STYLES.SPIRAL && (
+                        <>
+                          <div style={{ marginBottom: 16 }}>
+                            <label style={{ display: 'block', marginBottom: 4 }}>Spiral Radius: {curveRadius}px</label>
+                            <Slider min={100} max={400} value={curveRadius} onChange={setCurveRadius} />
+                          </div>
+                          <div style={{ marginBottom: 16 }}>
+                            <label style={{ display: 'block', marginBottom: 4 }}>Spiral Intensity: {curveIntensity}</label>
+                            <Slider min={0.5} max={3} step={0.1} value={curveIntensity} onChange={setCurveIntensity} />
+                          </div>
+                        </>
+                      )}
+
+                      {[CURVE_STYLES.WAVE, CURVE_STYLES.FLAG].includes(curveStyle) && (
+                        <div style={{ marginBottom: 16 }}>
+                          <label style={{ display: 'block', marginBottom: 4 }}>Wave Amplitude: {curveAmplitude}px</label>
+                          <Slider min={20} max={150} value={curveAmplitude} onChange={setCurveAmplitude} />
+                        </div>
+                      )}
+
+                      {/* Letter Spacing */}
+                      <div style={{ marginBottom: 16 }}>
+                        <label style={{ display: 'block', marginBottom: 4 }}>Letter Spacing: {curveLetterSpacing}</label>
+                        <Slider min={-0.5} max={1.5} step={0.1} value={curveLetterSpacing} onChange={setCurveLetterSpacing} />
+                      </div>
+
+                      {/* Reverse Direction */}
+                      <div style={{ marginBottom: 16 }}>
+                        <label>
+                          <input
+                            type="checkbox"
+                            checked={curveReverse}
+                            onChange={(e) => setCurveReverse(e.target.checked)}
+                          />
+                          Reverse Direction
+                        </label>
+                      </div>
+                    </div>
+                  </Modal>
+                </>
               )}
               {tool === "Images" && (
                 <ImageTool action={(url) => addImage(canvas, url)} />

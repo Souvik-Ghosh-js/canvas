@@ -90,7 +90,7 @@ function TextTool({ action, addWordCurvature }) {
           className="text-6xl font-extrabold cursor-pointer"
           onClick={addWordCurvature}
         >
-          A
+          
         </h1>
       </section>
     </div>
