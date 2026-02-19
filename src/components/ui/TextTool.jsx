@@ -81,18 +81,8 @@ function TextTool({ action, addWordCurvature }) {
           A
         </h1>
       </section>
-      <section>
-        <h1 className=" font-semibold mt-2">Word Curvature</h1>
-        <hr className="border-gray-300" />
-      </section>
-      <section className="flex flex-wrap gap-3">
-        <h1
-          className="text-6xl font-extrabold cursor-pointer"
-          onClick={addWordCurvature}
-        >
-          
-        </h1>
-      </section>
+     
+
     </div>
   );
 }

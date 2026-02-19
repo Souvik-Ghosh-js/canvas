@@ -52,6 +52,8 @@ function TextProperties({
   onTextAlign,
   onOpacityChange,
   opacity,
+    onCurveChange
+
 }) {
   return (
     <div className="px-4">
@@ -127,6 +129,20 @@ function TextProperties({
             onChange={onOpacityChange}
           />
         </section>
+        <section className="mt-3">
+  <label className="text-xs font-semibold text-gray-600">
+    Curve
+  </label>
+  <input
+    type="range"
+    min="-100"
+    max="100"
+    defaultValue="0"
+    onChange={onCurveChange}
+    className="w-full"
+  />
+</section>
+
       </section>
     </div>
   );

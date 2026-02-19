@@ -7,6 +7,8 @@ import { useEffect, useState } from "react";
 import ImageProperties from "./ImageProperties";
 import { applyMask } from "../utils/imageMask";
 import { loadCustomFont } from "../utils/loadCustomFont";
+import { applyTextBend } from "../utils/applyTextBlend";
+
 import {
   RotateCw,
   FlipHorizontal,
@@ -18,6 +20,8 @@ function Settings({ canvas, isSideBarOpen }) {
   const [canvasWidth, setCanvasWidth] = useState("");
   const [canvasHeight, setCanvasHeight] = useState("");
   const [canvasColor, setCanvasColor] = useState("");
+  const [bend, setBend] = useState(0);
+  const [distort, setDistort] = useState(0);
 
   const {
     selectedObject,
@@ -76,9 +80,35 @@ function Settings({ canvas, isSideBarOpen }) {
     setHeight(intValue);
     if (selectedObject && intValue >= 0) {
       selectedObject.set({ height: intValue / selectedObject.scaleY });
-      canvas.renderAll();
+canvas.requestRenderAll();
     }
   };
+
+const handleCurveChange = (e) => {
+  const value = parseInt(e.target.value, 10);
+
+  if (selectedObject?.type === "textbox") {
+    applyTextBend(selectedObject, value);
+    canvas.requestRenderAll();
+  }
+};
+
+
+  const handleDistortChange = (e) => {
+    const value = Number(e.target.value) / 100;
+    setDistort(value);
+
+    const activeObject = canvas.getActiveObject();
+    if (activeObject?.type === "textbox") {
+      applyTextBend(activeObject, {
+        bend: bend,
+        distort: value,
+      });
+canvas.requestRenderAll();
+    }
+  };
+
+
 
   const handleColorChange = (e) => {
     const value = e.target.value;
@@ -187,9 +217,8 @@ function Settings({ canvas, isSideBarOpen }) {
 
   return (
     <div
-      className={`bg-linear-to-b from-white to-blue-50/30 w-80  py-4 transition-all duration-300 h-full overflow-y-scroll md:right-0 z-50 absolute md:relative  border-l border-gray-200/50 shadow-xl ${
-        isSideBarOpen ? "right-0" : "-right-full"
-      }`}
+      className={`bg-linear-to-b from-white to-blue-50/30 w-80  py-4 transition-all duration-300 h-full overflow-y-scroll md:right-0 z-50 absolute md:relative  border-l border-gray-200/50 shadow-xl ${isSideBarOpen ? "right-0" : "-right-full"
+        }`}
     >
       {/* Header */}
       <section className="px-6 pb-4 border-b border-gray-200/50">
@@ -203,10 +232,9 @@ function Settings({ canvas, isSideBarOpen }) {
             </h1>
             <p className="text-xs text-gray-500">
               {selectedObject
-                ? `${
-                    selectedObject.type.charAt(0).toUpperCase() +
-                    selectedObject.type.slice(1)
-                  } Settings`
+                ? `${selectedObject.type.charAt(0).toUpperCase() +
+                selectedObject.type.slice(1)
+                } Settings`
                 : "Canvas Settings"}
             </p>
           </div>
@@ -320,6 +348,11 @@ function Settings({ canvas, isSideBarOpen }) {
             color={color}
             opacity={opacity}
             onOpacityChange={handleOpacityChange}
+            bend={bend}
+            distort={distort}
+            onCurveChange={handleCurveChange}
+
+
           />
         )}
         {selectedObject?.type === "image" && (
