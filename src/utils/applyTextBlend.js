@@ -8,7 +8,11 @@ export const applyTextBend = (textbox, curve = 0) => {
     textbox._arcPatched = true;
 
     const originalRender = textbox._renderTextLine;
+    const originalGetDims = textbox._getNonTransformedDimensions;
 
+    // =====================================================
+    // 🔥 CURVED TEXT RENDER
+    // =====================================================
     textbox._renderTextLine = function (
       method,
       ctx,
@@ -17,7 +21,6 @@ export const applyTextBend = (textbox, curve = 0) => {
       top,
       lineIndex
     ) {
-      // If no curve → render normally
       if (!this._curve) {
         return originalRender.call(
           this,
@@ -33,36 +36,38 @@ export const applyTextBend = (textbox, curve = 0) => {
       const charCount = line.length;
       if (!charCount) return;
 
-      // =============================
-      // 🔥 Dynamic radius (professional)
-      // =============================
-      const textWidth = this.calcTextWidth();
-      const strength = this._curve;
+      const safeStrength = Math.max(-100, Math.min(100, this._curve));
 
-      // Prevent extreme distortion
-      const safeStrength = Math.max(-100, Math.min(100, strength));
-
-      const radius =
-        textWidth / (safeStrength * 0.05 || 0.0001);
-
-      // =============================
-      // 🔥 Accurate char widths (Fabric 6)
-      // =============================
+      // Measure true line width
       let totalArcLength = 0;
       const charWidths = [];
 
       for (let i = 0; i < charCount; i++) {
         const bounds = this.__charBounds?.[lineIndex]?.[i];
-        const width = bounds?.kernedWidth || bounds?.width || this.fontSize * 0.6;
+        const width =
+          bounds?.kernedWidth ||
+          bounds?.width ||
+          this.fontSize * 0.6;
 
         charWidths.push(width);
         totalArcLength += width;
       }
 
+      const radius =
+        totalArcLength / (safeStrength * 0.05 || 0.0001);
+
       const totalAngle = totalArcLength / radius;
       let currentAngle = -totalAngle / 2;
 
-      const baseline = top;
+      // 🔥 Horizontal true center fix
+      const centerX = left + totalArcLength / 2;
+
+      // 🔥 Vertical centering fix
+      const theta = totalArcLength / radius;
+      const arcHeight =
+        Math.abs(radius) * (1 - Math.cos(theta / 2));
+
+      const baseline = top - arcHeight;
 
       ctx.save();
 
@@ -71,7 +76,7 @@ export const applyTextBend = (textbox, curve = 0) => {
         const charAngle = charWidth / radius;
         const angle = currentAngle + charAngle / 2;
 
-        const x = left + radius * Math.sin(angle);
+        const x = centerX + radius * Math.sin(angle);
         const y = baseline - radius * Math.cos(angle) + radius;
 
         ctx.save();
@@ -96,9 +101,32 @@ export const applyTextBend = (textbox, curve = 0) => {
       ctx.restore();
     };
 
-    // =============================
-    // Editing Mode Handling
-    // =============================
+    // =====================================================
+    // 🔥 DIMENSION FIX (Selection Box Correct)
+    // =====================================================
+    textbox._getNonTransformedDimensions = function () {
+      const dims = originalGetDims.call(this);
+
+      if (!this._curve) return dims;
+
+      const safeStrength = Math.max(-100, Math.min(100, this._curve));
+      const textWidth = this.calcTextWidth();
+      const radius =
+        textWidth / (safeStrength * 0.05 || 0.0001);
+
+      const theta = textWidth / radius;
+      const arcHeight =
+        Math.abs(radius) * (1 - Math.cos(theta / 2));
+
+      return {
+        x: dims.x,
+        y: dims.y + arcHeight * 2
+      };
+    };
+
+    // =====================================================
+    // 🔥 Editing Mode Safe Handling
+    // =====================================================
     textbox.on("editing:entered", function () {
       this._editingCurveBackup = this._curve;
       this._curve = 0;
@@ -107,18 +135,9 @@ export const applyTextBend = (textbox, curve = 0) => {
 
     textbox.on("editing:exited", function () {
       this._curve = this._editingCurveBackup || 0;
-      applyTextBend(this, this._curve);
+      this.setCoords();
     });
   }
-
-  // =============================
-  // Bounding Box Adjustment
-  // =============================
-  const extraHeight = Math.abs(curve) * 1.5;
-
-  textbox.set({
-    height: textbox.fontSize + extraHeight
-  });
 
   textbox.setCoords();
 };
