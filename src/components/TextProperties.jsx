@@ -1,44 +1,7 @@
+import { useState, useEffect } from "react";
 import Inputs from "./ui/Inputs";
-const fonts = [
-  // System fonts
-  { name: "Arial", font: "Arial", category: "sans-serif" },
-  { name: "Helvetica", font: "Helvetica", category: "sans-serif" },
-  { name: "Verdana", font: "Verdana", category: "sans-serif" },
-  { name: "Tahoma", font: "Tahoma", category: "sans-serif" },
-  { name: "Trebuchet MS", font: "Trebuchet MS", category: "sans-serif" },
-  { name: "Gill Sans", font: "Gill Sans", category: "sans-serif" },
-  { name: "Segoe UI", font: "Segoe UI", category: "sans-serif" },
+import { allFonts, fontCategories } from "../config/fonts";
 
-  { name: "Times New Roman", font: "Times New Roman", category: "serif" },
-  { name: "Georgia", font: "Georgia", category: "serif" },
-  { name: "Palatino Linotype", font: "Palatino Linotype", category: "serif" },
-  { name: "Book Antiqua", font: "Book Antiqua", category: "serif" },
-  { name: "Garamond", font: "Garamond", category: "serif" },
-
-  { name: "Courier New", font: "Courier New", category: "monospace" },
-  { name: "Lucida Console", font: "Lucida Console", category: "monospace" },
-  { name: "Monaco", font: "Monaco", category: "monospace" },
-  { name: "Consolas", font: "Consolas", category: "monospace" },
-
-  { name: "Impact", font: "Impact", category: "display" },
-  { name: "Comic Sans MS", font: "Comic Sans MS", category: "display" },
-  { name: "গলদা ", font: "Galada", category: "serif" },
-  {
-    name: "নাতো সান্স বাঙ্গালী",
-    font: "Noto Sans Bengali",
-    category: "sans-serif",
-  },
-  {
-    name: "হিন্দি শিলিগুড়ি ",
-    font: "Hind Siliguri",
-    category: "sans-serif",
-  },
-  {
-    name: "আত্মা",
-    font: "Atma",
-    category: "sans-serif",
-  },
-];
 function TextProperties({
   fontSize,
   onFontSizeChange,
@@ -52,44 +15,96 @@ function TextProperties({
   onTextAlign,
   onOpacityChange,
   opacity,
-    onCurveChange
-
+  onCurveChange
 }) {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [localFont, setLocalFont] = useState(font); // Add local state
+
+  // Update local state when prop changes
+  useEffect(() => {
+    setLocalFont(font);
+  }, [font]);
+
+  // Filter fonts based on search and category
+  const filteredFonts = allFonts.filter(fontItem => {
+    const matchesSearch = fontItem.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         fontItem.font.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = selectedCategory === "all" || fontItem.category === selectedCategory;
+    return matchesSearch && matchesCategory;
+  });
+
+  // Handle font selection with loading
+  const handleFontChange = (e) => {
+    const selectedFont = e.target.value;
+    const fontData = allFonts.find(f => f.font === selectedFont);
+    
+    // Update local state immediately for responsive UI
+    setLocalFont(selectedFont);
+    
+    // Call parent handler
+    onFontChange(e);
+  };
+
+  // Load initial font if it's a Google Font
+  useEffect(() => {
+    if (font) {
+      const currentFont = allFonts.find(f => f.font === font);
+    }
+  }, [font]);
+
   return (
-    <div className="px-4">
+    <div className="px-3 ">
       <section className="flex flex-col mb-2">
-        <label htmlFor="" className="font-bold">
-          Typography
-        </label>
+        <label className="font-bold">Typography</label>
+        
+        {/* Search input */}
+        <input
+          type="text"
+          placeholder="Search fonts..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="bg-gray-100 text-sm py-1 px-2 border-2 border-black-200 mt-2 w-full"
+        />
+        
+        {/* Category filter */}
+        <select
+          value={selectedCategory}
+          onChange={(e) => setSelectedCategory(e.target.value)}
+          className="bg-gray-100 text-sm py-1 px-1 border-2 border-black-200 mt-2 w-full"
+        >
+          <option value="all">All Categories</option>
+          {fontCategories.map(category => (
+            <option key={category} value={category}>
+              {category.charAt(0).toUpperCase() + category.slice(1)}
+            </option>
+          ))}
+        </select>
+        
         <section>
           <select
             className="bg-gray-100 text-sm py-1 px-1 border-2 border-black-200 mt-2 w-full"
-            onChange={onFontChange}
+            onChange={handleFontChange}
+            value={localFont} // Use local state here instead of prop
+            size="5"
           >
-            <option className="hidden">{font}</option>
-            {fonts.map((font, index) => (
+            {filteredFonts.map((fontItem, index) => (
               <option
                 key={index}
-                value={font.font}
-                style={{ fontFamily: font.font }}
+                value={fontItem.font}
+                style={{ fontFamily: fontItem.font }}
               >
-                {font.name}
+                {fontItem.name} {fontItem.source !== "system" && `(${fontItem.source})`}
               </option>
             ))}
           </select>
+          
           <section className="flex justify-between items-center mt-3 mb-3">
             <select
               onChange={onFontWeightChange}
-              className="bg-gray-100 text-sm py-1 px-1 border-2 border-black-200 w-1/2  h-8"
+              value={fontWeight}
+              className="bg-gray-100 text-sm py-1 px-1 border-2 border-black-200 w-1/2 h-8"
             >
-              <option className="hidden">
-                {fontWeight == 300 && "Light"}
-                {fontWeight == 400 && "Regular"}
-                {fontWeight == 500 && "Medium"}
-                {fontWeight == 600 && "Semi-Bold"}
-                {fontWeight == 700 && "Bold"}
-                {fontWeight == 800 && "Extra-Bold"}
-              </option>
               <option value={300}>Light</option>
               <option value={400}>Regular</option>
               <option value={500}>Medium</option>
@@ -105,6 +120,7 @@ function TextProperties({
               onChange={onFontSizeChange}
             />
           </section>
+          
           <section className="flex gap-2 mb-3">
             <Inputs
               icon="Fill"
@@ -113,15 +129,16 @@ function TextProperties({
               onChange={onColorChange}
             />
             <select
-              className="bg-gray-100 text-sm capitalize py-1 px-1 border-2 border-black-200 w-1/2  h-8"
+              className="bg-gray-100 text-sm capitalize py-1 px-1 border-2 border-black-200 w-1/2 h-8"
               onChange={onTextAlign}
+              value={textAlign}
             >
-              <option className="hidden">{textAlign}</option>
-              <option value="center">Center</option>
               <option value="left">Left</option>
+              <option value="center">Center</option>
               <option value="right">Right</option>
             </select>
           </section>
+          
           <Inputs
             icon="O"
             type="number"
@@ -129,20 +146,20 @@ function TextProperties({
             onChange={onOpacityChange}
           />
         </section>
+        
         <section className="mt-3">
-  <label className="text-xs font-semibold text-gray-600">
-    Curve
-  </label>
-  <input
-    type="range"
-    min="-100"
-    max="100"
-    defaultValue="0"
-    onChange={onCurveChange}
-    className="w-full"
-  />
-</section>
-
+          <label className="text-xs font-semibold text-gray-600">
+            Curve
+          </label>
+          <input
+            type="range"
+            min="-100"
+            max="100"
+            value={0}
+            onChange={onCurveChange}
+            className="w-full"
+          />
+        </section>
       </section>
     </div>
   );

@@ -163,14 +163,17 @@ canvas.requestRenderAll();
     }
   };
 
-  const handleFontChange = async (e) => {
-    await loadCustomFont("Noto Sans Bengali");
-    const value = e.target.value;
-    if (selectedObject?.type === "textbox") {
-      selectedObject.set({ fontFamily: value });
-      canvas.renderAll();
-    }
-  };
+const handleFontChange = async (e) => {
+  const value = e.target.value;
+  
+  // Load the selected font
+  await loadCustomFont(value);
+  
+  if (selectedObject?.type === "textbox") {
+    selectedObject.set({ fontFamily: value });
+    canvas.renderAll();
+  }
+};
 
   const handleTextAlign = (e) => {
     const value = e.target.value;
