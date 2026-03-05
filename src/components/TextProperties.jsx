@@ -86,7 +86,7 @@ function TextProperties({
             className="bg-gray-100 text-sm py-1 px-1 border-2 border-black-200 mt-2 w-full"
             onChange={handleFontChange}
             value={localFont} // Use local state here instead of prop
-            size="5"
+            size="1"
           >
             {filteredFonts.map((fontItem, index) => (
               <option
