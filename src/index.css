@@ -2,7 +2,13 @@
 @import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
+/* Add Bengali font support */
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@300;400;500;600;700&display=swap');
 
+.font-bengali {
+  font-family: 'Noto Sans Bengali', 'Hind Siliguri', sans-serif;
+}
 body {
   margin: 0;
   padding: 0;

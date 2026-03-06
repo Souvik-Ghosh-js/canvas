@@ -26,6 +26,8 @@ import {
   FaLayerGroup,
 } from "react-icons/fa6";
 import { FaPaintBrush } from "react-icons/fa";
+import BengaliKeyboardModal from './components/ui/BengaliKeyboardModal';
+import BengaliTextButton from './components/ui/BengaliTextButton';
 import { IoImagesSharp, IoSettings } from "react-icons/io5";
 import { IoIosCloseCircle } from "react-icons/io";
 import { RiSendToBack, RiBringToFront } from "react-icons/ri";
@@ -74,7 +76,8 @@ function App() {
   const { Option } = Select;
   const clipboardRef = useRef(null);
 
-
+const [isBengaliKeyboardOpen, setIsBengaliKeyboardOpen] = useState(false);
+const [showBengaliButton, setShowBengaliButton] = useState(false);
   const { canvasRef, canvas, designSize } = useFabricCanvas();
   const [canvasList, setCanvasList] = useState([{ id: 1, json: null }]);
   const [activePage, setActivePage] = useState(1);
@@ -121,6 +124,88 @@ function App() {
     }
   };
 
+  // Show Bengali button when text object is selected
+useEffect(() => {
+  if (!canvas) return;
+
+  const handleSelectionCreated = (e) => {
+    const selected = e.selected?.[0];
+    if (selected && (selected.type === 'text' || selected.type === 'textbox' || selected.type === 'i-text')) {
+      setShowBengaliButton(true);
+    } else {
+      setShowBengaliButton(false);
+    }
+  };
+
+  const handleSelectionCleared = () => {
+    setShowBengaliButton(false);
+  };
+
+  const handleSelectionUpdated = (e) => {
+    const selected = e.selected?.[0];
+    if (selected && (selected.type === 'text' || selected.type === 'textbox' || selected.type === 'i-text')) {
+      setShowBengaliButton(true);
+    } else {
+      setShowBengaliButton(false);
+    }
+  };
+
+  canvas.on('selection:created', handleSelectionCreated);
+  canvas.on('selection:cleared', handleSelectionCleared);
+  canvas.on('selection:updated', handleSelectionUpdated);
+
+  return () => {
+    canvas.off('selection:created', handleSelectionCreated);
+    canvas.off('selection:cleared', handleSelectionCleared);
+    canvas.off('selection:updated', handleSelectionUpdated);
+  };
+}, [canvas]);
+
+
+const handleUpdateSelectedText = (bengaliText) => {
+  if (!canvas) return;
+  
+  const activeObject = canvas.getActiveObject();
+  if (activeObject && (activeObject.type === 'text' || activeObject.type === 'textbox' || activeObject.type === 'i-text')) {
+    activeObject.set('text', bengaliText);
+    activeObject.set('fontFamily', 'Noto Sans Bengali, Arial, sans-serif');
+    canvas.renderAll();
+    canvas.requestRenderAll();
+  }
+};
+
+
+const handleBengaliTextInsert = (bengaliText) => {
+  if (!canvas) return;
+  
+  const activeObject = canvas.getActiveObject();
+  
+  // Check if a text object is selected
+  if (activeObject && (activeObject.type === 'text' || activeObject.type === 'textbox' || activeObject.type === 'i-text')) {
+    // Update existing text
+    activeObject.set('text', bengaliText);
+    activeObject.set('fontFamily', 'Noto Sans Bengali, Arial, sans-serif');
+    canvas.renderAll();
+    canvas.requestRenderAll();
+  } else {
+    // Create new textbox
+    const textbox = new Textbox(bengaliText, {
+      left: 100,
+      top: 100,
+      fontSize: 40,
+      fill: "#000000",
+      width: 300,
+      fontFamily: "Noto Sans Bengali, Arial, sans-serif",
+    });
+    
+    canvas.add(textbox);
+    canvas.setActiveObject(textbox);
+    canvas.requestRenderAll();
+  }
+  
+  setIsBengaliKeyboardOpen(false);
+  setShowBengaliButton(false);
+};
   const handleZoomChange = (value) => {
     if (!canvas) return;
 
@@ -1277,6 +1362,18 @@ useEffect(() => {
           </div>
 
           {/* Floating Object Controls */}
+          {/* Bengali Text Button */}
+<BengaliTextButton
+  isVisible={showBengaliButton}
+  onClick={() => setIsBengaliKeyboardOpen(true)}
+/>
+
+{/* Bengali Keyboard Modal */}
+<BengaliKeyboardModal
+  isOpen={isBengaliKeyboardOpen}
+  onClose={() => setIsBengaliKeyboardOpen(false)}
+  onInsert={handleBengaliTextInsert}
+/>
           {showDelete && (
             <div className="fixed bottom-16 left-1/2 transform -translate-x-1/2 flex items-center gap-3 bg-white/95 backdrop-blur-sm px-4 py-3 rounded-2xl shadow-2xl border border-gray-200/50 z-40">
               <button

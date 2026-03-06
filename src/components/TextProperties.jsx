@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import Inputs from "./ui/Inputs";
 import { allFonts, fontCategories } from "../config/fonts";
+import { Languages } from "lucide-react"; // Add this import
 
 function TextProperties({
   fontSize,
@@ -146,7 +147,6 @@ function TextProperties({
             onChange={onOpacityChange}
           />
         </section>
-        
         <section className="mt-3">
           <label className="text-xs font-semibold text-gray-600">
             Curve
