@@ -716,57 +716,99 @@ function App() {
   }, [canvas]);
 
   // --- Canvas event listeners
-  useEffect(() => {
+useEffect(() => {
+  if (!canvas) return;
+
+  const handleKeyDown = async (e) => {
     if (!canvas) return;
 
-    const handleKeyDown = async (e) => {
-      if (!canvas) return;
-
-      // COPY (Ctrl + C)
-      if (e.ctrlKey && e.key.toLowerCase() === "c") {
-        const activeObject = canvas.getActiveObject();
-        if (activeObject) {
-          clipboardRef.current = await activeObject.clone();
-        }
+    // COPY (Ctrl + C)
+    if (e.ctrlKey && e.key.toLowerCase() === "c") {
+      const activeObject = canvas.getActiveObject();
+      if (activeObject) {
+        clipboardRef.current = await activeObject.clone();
       }
+    }
 
-      // PASTE (Ctrl + V)
-      if (e.ctrlKey && e.key.toLowerCase() === "v") {
-        if (clipboardRef.current) {
-          const clonedObj = await clipboardRef.current.clone();
+    // PASTE (Ctrl + V)
+    if (e.ctrlKey && e.key.toLowerCase() === "v") {
+      let pastedFromSystem = false;
 
-          canvas.discardActiveObject();
-
-          clonedObj.set({
-            left: clonedObj.left + 20,
-            top: clonedObj.top + 20,
-            evented: true,
-          });
-
-          if (clonedObj.type === "activeSelection") {
-            clonedObj.canvas = canvas;
-            clonedObj.forEachObject((obj) => {
-              canvas.add(obj);
-            });
-            clonedObj.setCoords();
-          } else {
-            canvas.add(clonedObj);
+      try {
+        const clipboardItems = await navigator.clipboard.read();
+        for (const item of clipboardItems) {
+          // Handle image from system clipboard
+          if (item.types.includes("image/png") || item.types.includes("image/jpeg")) {
+            const imageType = item.types.find(t => t.startsWith("image/"));
+            const blob = await item.getType(imageType);
+            const url = URL.createObjectURL(blob);
+            addImage(canvas, url);
+            pastedFromSystem = true;
+            break;
           }
 
-          canvas.setActiveObject(clonedObj);
-          canvas.requestRenderAll();
+          // Handle text from system clipboard
+          if (item.types.includes("text/plain")) {
+            const blob = await item.getType("text/plain");
+            const text = await blob.text();
+
+            // Only treat as system paste if text doesn't match a canvas object
+            // i.e., user copied text from outside the app
+            if (text && text.trim().length > 0) {
+              const textbox = new Textbox(text, {
+                left: 100,
+                top: 100,
+                fontSize: 20,
+                fill: "black",
+                width: 300,
+              });
+              canvas.add(textbox);
+              canvas.setActiveObject(textbox);
+              canvas.requestRenderAll();
+              pastedFromSystem = true;
+              break;
+            }
+          }
         }
+      } catch (err) {
+        // Clipboard API not available or permission denied — fall through
+        pastedFromSystem = false;
       }
-    };
 
-    document.addEventListener("keydown", handleKeyDown);
+      // Fall back to internal canvas clipboard ONLY if nothing pasted from system
+      if (!pastedFromSystem && clipboardRef.current) {
+        const clonedObj = await clipboardRef.current.clone();
 
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  },
-    [canvas, activePage, canvasList]);
+        canvas.discardActiveObject();
 
+        clonedObj.set({
+          left: clonedObj.left + 20,
+          top: clonedObj.top + 20,
+          evented: true,
+        });
+
+        if (clonedObj.type === "activeSelection") {
+          clonedObj.canvas = canvas;
+          clonedObj.forEachObject((obj) => {
+            canvas.add(obj);
+          });
+          clonedObj.setCoords();
+        } else {
+          canvas.add(clonedObj);
+        }
+
+        canvas.setActiveObject(clonedObj);
+        canvas.requestRenderAll();
+      }
+    }
+  };
+
+  document.addEventListener("keydown", handleKeyDown);
+
+  return () => {
+    document.removeEventListener("keydown", handleKeyDown);
+  };
+}, [canvas, activePage, canvasList]);
   const { undo, redo, canUndo, canRedo } = useHistory(canvas);
 
   return (
