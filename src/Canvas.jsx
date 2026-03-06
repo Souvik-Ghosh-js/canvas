@@ -1,4 +1,4 @@
-import { useEffect, useState , useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import Header from "./components/Header";
 import ToolModal from "./components/modal/ToolModal";
 import ToolButton from "./components/ui/ToolButton";
@@ -72,7 +72,7 @@ import { sendEmail } from "./utils/emailService";
 
 function App() {
   const { Option } = Select;
-const clipboardRef = useRef(null);
+  const clipboardRef = useRef(null);
 
 
   const { canvasRef, canvas, designSize } = useFabricCanvas();
@@ -667,105 +667,105 @@ const clipboardRef = useRef(null);
   };
 
   const handleCopyObject = async () => {
-  const activeObject = canvas.getActiveObject();
-  if (activeObject) {
-    clipboardRef.current = await activeObject.clone();
-  }
-};
-
-const handlePasteObject = async () => {
-  if (clipboardRef.current) {
-    const clonedObj = await clipboardRef.current.clone();
-
-    clonedObj.set({
-      left: clonedObj.left + 20,
-      top: clonedObj.top + 20,
-      evented: true,
-    });
-
-    canvas.add(clonedObj);
-    canvas.setActiveObject(clonedObj);
-    canvas.requestRenderAll();
-  }
-};
-
-useEffect(() => {
-  if (!canvas) return;
-
-  const handleSelectionCreated = () => {
-    setShowDelete(true);
+    const activeObject = canvas.getActiveObject();
+    if (activeObject) {
+      clipboardRef.current = await activeObject.clone();
+    }
   };
 
-  const handleSelectionCleared = () => {
-    setShowDelete(false);
+  const handlePasteObject = async () => {
+    if (clipboardRef.current) {
+      const clonedObj = await clipboardRef.current.clone();
+
+      clonedObj.set({
+        left: clonedObj.left + 20,
+        top: clonedObj.top + 20,
+        evented: true,
+      });
+
+      canvas.add(clonedObj);
+      canvas.setActiveObject(clonedObj);
+      canvas.requestRenderAll();
+    }
   };
 
-  const handleSelectionUpdated = () => {
-    setShowDelete(true);
-  };
-
-  canvas.on('selection:created', handleSelectionCreated);
-  canvas.on('selection:cleared', handleSelectionCleared);
-  canvas.on('selection:updated', handleSelectionUpdated);
-
-  return () => {
-    canvas.off('selection:created', handleSelectionCreated);
-    canvas.off('selection:cleared', handleSelectionCleared);
-    canvas.off('selection:updated', handleSelectionUpdated);
-  };
-}, [canvas]);
-
-  // --- Canvas event listeners
- useEffect(() => {
-  if (!canvas) return;
-
-  const handleKeyDown = async (e) => {
+  useEffect(() => {
     if (!canvas) return;
 
-    // COPY (Ctrl + C)
-    if (e.ctrlKey && e.key.toLowerCase() === "c") {
-      const activeObject = canvas.getActiveObject();
-      if (activeObject) {
-        clipboardRef.current = await activeObject.clone();
-      }
-    }
+    const handleSelectionCreated = () => {
+      setShowDelete(true);
+    };
 
-    // PASTE (Ctrl + V)
-    if (e.ctrlKey && e.key.toLowerCase() === "v") {
-      if (clipboardRef.current) {
-        const clonedObj = await clipboardRef.current.clone();
+    const handleSelectionCleared = () => {
+      setShowDelete(false);
+    };
 
-        canvas.discardActiveObject();
+    const handleSelectionUpdated = () => {
+      setShowDelete(true);
+    };
 
-        clonedObj.set({
-          left: clonedObj.left + 20,
-          top: clonedObj.top + 20,
-          evented: true,
-        });
+    canvas.on('selection:created', handleSelectionCreated);
+    canvas.on('selection:cleared', handleSelectionCleared);
+    canvas.on('selection:updated', handleSelectionUpdated);
 
-        if (clonedObj.type === "activeSelection") {
-          clonedObj.canvas = canvas;
-          clonedObj.forEachObject((obj) => {
-            canvas.add(obj);
-          });
-          clonedObj.setCoords();
-        } else {
-          canvas.add(clonedObj);
+    return () => {
+      canvas.off('selection:created', handleSelectionCreated);
+      canvas.off('selection:cleared', handleSelectionCleared);
+      canvas.off('selection:updated', handleSelectionUpdated);
+    };
+  }, [canvas]);
+
+  // --- Canvas event listeners
+  useEffect(() => {
+    if (!canvas) return;
+
+    const handleKeyDown = async (e) => {
+      if (!canvas) return;
+
+      // COPY (Ctrl + C)
+      if (e.ctrlKey && e.key.toLowerCase() === "c") {
+        const activeObject = canvas.getActiveObject();
+        if (activeObject) {
+          clipboardRef.current = await activeObject.clone();
         }
-
-        canvas.setActiveObject(clonedObj);
-        canvas.requestRenderAll();
       }
-    }
-  };
 
-  document.addEventListener("keydown", handleKeyDown);
+      // PASTE (Ctrl + V)
+      if (e.ctrlKey && e.key.toLowerCase() === "v") {
+        if (clipboardRef.current) {
+          const clonedObj = await clipboardRef.current.clone();
 
-  return () => {
-    document.removeEventListener("keydown", handleKeyDown);
-  };
-}, 
-[canvas, activePage, canvasList]);
+          canvas.discardActiveObject();
+
+          clonedObj.set({
+            left: clonedObj.left + 20,
+            top: clonedObj.top + 20,
+            evented: true,
+          });
+
+          if (clonedObj.type === "activeSelection") {
+            clonedObj.canvas = canvas;
+            clonedObj.forEachObject((obj) => {
+              canvas.add(obj);
+            });
+            clonedObj.setCoords();
+          } else {
+            canvas.add(clonedObj);
+          }
+
+          canvas.setActiveObject(clonedObj);
+          canvas.requestRenderAll();
+        }
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  },
+    [canvas, activePage, canvasList]);
 
   const { undo, redo, canUndo, canRedo } = useHistory(canvas);
 
@@ -1132,7 +1132,7 @@ useEffect(() => {
               {tool === "Shapes" && <ShapeTool action={handler} />}
               {tool === "Background" && (
                 <BGTool
-                  addBackground={(url) => addBG(canvas, url, canvasList)}
+                  addBackground={(url, opacity) => addBG(canvas, url, canvasList, opacity)}
                 />
               )}
               {tool === "School Logo" && (
@@ -1238,20 +1238,20 @@ useEffect(() => {
           {showDelete && (
             <div className="fixed bottom-16 left-1/2 transform -translate-x-1/2 flex items-center gap-3 bg-white/95 backdrop-blur-sm px-4 py-3 rounded-2xl shadow-2xl border border-gray-200/50 z-40">
               <button
-  onClick={handleCopyObject}
-  className="p-2 text-gray-600 hover:bg-green-50 hover:text-green-600 rounded-xl transition-all duration-200 hover:scale-110"
-  title="Copy (Ctrl+C)"
->
-  <Copy size={18} />
-</button>
+                onClick={handleCopyObject}
+                className="p-2 text-gray-600 hover:bg-green-50 hover:text-green-600 rounded-xl transition-all duration-200 hover:scale-110"
+                title="Copy (Ctrl+C)"
+              >
+                <Copy size={18} />
+              </button>
 
-<button
-  onClick={handlePasteObject}
-  className="p-2 text-gray-600 hover:bg-purple-50 hover:text-purple-600 rounded-xl transition-all duration-200 hover:scale-110"
-  title="Paste (Ctrl+V)"
->
-  <Plus size={18} />
-</button>
+              <button
+                onClick={handlePasteObject}
+                className="p-2 text-gray-600 hover:bg-purple-50 hover:text-purple-600 rounded-xl transition-all duration-200 hover:scale-110"
+                title="Paste (Ctrl+V)"
+              >
+                <Plus size={18} />
+              </button>
 
               <button
                 className="p-2 text-red-500 cursor-pointer hover:bg-red-50 rounded-xl transition-all duration-200 hover:scale-110"

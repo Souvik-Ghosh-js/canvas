@@ -1,7 +1,7 @@
 // utils/backGroundTool.js
 import { FabricImage } from "fabric";
 
-export const addBG = async (canvas, url, allPages = []) => {
+export const addBG = async (canvas, url, allPages = [], opacity = 1) => {
   try {
     const cw = canvas.getWidth();
     const ch = canvas.getHeight();
@@ -9,6 +9,9 @@ export const addBG = async (canvas, url, allPages = []) => {
     const img = await FabricImage.fromURL(url, {
       crossOrigin: "anonymous",
     });
+
+    // Set opacity on the image
+    img.set('opacity', opacity);
 
     // Check if any page has templates
     const hasTemplatesInAnyPage = checkForTemplatesInPages(canvas, allPages);
@@ -24,8 +27,12 @@ export const addBG = async (canvas, url, allPages = []) => {
     }
 
     canvas.requestRenderAll();
+    
+    // Return the image object in case you need to reference it later
+    return img;
   } catch (err) {
     console.error("Error loading BG:", err);
+    throw err;
   }
 };
 
