@@ -31,6 +31,24 @@ export const systemFonts = [
   { name: "নাতো সান্স বাঙ্গালী", font: "Noto Sans Bengali", category: "sans-serif", source: "system" },
   { name: "হিন্দি শিলিগুড়ি", font: "Hind Siliguri", category: "sans-serif", source: "system" },
   { name: "আত্মা", font: "Atma", category: "sans-serif", source: "system" },
+  { name: "শ্রী", font: "Shree Devanagari 714", category: "serif", source: "system" },
+{ name: "বাংলা", font: "Bangla Sangam MN", category: "sans-serif", source: "system" },
+{ name: "মিত্র", font: "Mongolian Baiti", category: "serif", source: "system" }, // Often supports Bengali
+{ name: "কোহিনূর", font: "Kohinoor Bangla", category: "sans-serif", source: "system" }, // Common on Windows
+{ name: "নীলাদ্রি", font: "Nirmala UI", category: "sans-serif", source: "system" },
+{ name: "বালু দা ২", font: "Baloo Da 2", category: "sans-serif", source: "google" },
+{ name: "হিন্দ শিলিগুড়ি", font: "Hind Siliguri", category: "sans-serif", source: "google" }, // You already have this, marking as google
+{ name: "নাতো সান্স বাঙ্গালী", font: "Noto Sans Bengali", category: "sans-serif", source: "google" }, // You already have this, marking as google
+{ name: "আদিশীলা", font: "Adishila", category: "sans-serif", source: "google" },
+{ name: "চারুকোলা", font: "Charukola", category: "sans-serif", source: "google" },
+{ name: "আত্মা", font: "Atma", category: "serif", source: "google" }, // You already have this, marking as google
+{ name: "সোলাইমান লিপি", font: "SolaimanLipi", category: "serif", source: "google" }, // Very popular Bengali font
+{ name: "লিপিগ্রাম", font: "Lipishree", category: "serif", source: "google" }, // Often listed as Lipishree
+{ name: "আনন্দপুর", font: "Anandapur", category: "serif", source: "google" },
+{ name: "কালপুরুষ", font: "Kalpurush", category: "display", source: "google" }, // Standard in many government docs
+{ name: "মিতালি", font: "Mitali", category: "display", source: "google" },
+{ name: "সাগর", font: "Sagar", category: "handwriting", source: "google" }
+// A classic Bengali sans // Microsoft's system font for Indic scripts
 ];
 
 // Your downloaded fonts (with correct filenames)
